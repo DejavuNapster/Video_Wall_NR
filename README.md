@@ -1,4 +1,4 @@
-# Video Wall NR (PoC)
+# Video Wall NR
 
 Aplikasi desktop video wall multi-monitor untuk **Windows** (.exe), **Linux** (.deb / AppImage), dan **macOS** (.dmg, Intel + Apple Silicon).
 Unduh installer dari halaman [Releases](../../releases).
