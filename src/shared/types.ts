@@ -3,6 +3,9 @@ import type {
   EmergencyBannerSchema,
   MonitorLayoutSchema,
   PresetSchema,
+  AlertSettingsSchema,
+  BannerScheduleEntrySchema,
+  BannerTemplateSchema,
   ScheduleEntrySchema,
   SettingsSchema,
   SourceSchema,
@@ -17,6 +20,9 @@ export type Preset = z.infer<typeof PresetSchema>
 export type Settings = z.infer<typeof SettingsSchema>
 export type WallSettings = z.infer<typeof WallSettingsSchema>
 export type ScheduleEntry = z.infer<typeof ScheduleEntrySchema>
+export type BannerTemplate = z.infer<typeof BannerTemplateSchema>
+export type BannerScheduleEntry = z.infer<typeof BannerScheduleEntrySchema>
+export type AlertSettings = z.infer<typeof AlertSettingsSchema>
 export type EmergencyBanner = z.infer<typeof EmergencyBannerSchema>
 /** Mode tampilan banner darurat: 'cover' (fullscreen, default) atau 'strip' (baris atas, tile tetap terlihat). */
 export type BannerMode = EmergencyBanner['mode']
@@ -105,6 +111,18 @@ export interface AppState {
   /** Pesan bila penyimpanan otomatis preset aktif terakhir gagal. */
   saveError: string | null
   autostart: AutostartStatus
+  remote: RemoteStatus
+  /** Token bot Telegram untuk peringatan sudah tersimpan (nilainya tidak pernah dikirim ke UI). */
+  telegramTokenSet: boolean
+}
+
+/** Status server kendali jarak jauh. */
+export interface RemoteStatus {
+  running: boolean
+  /** Alamat yang bisa dibuka dari perangkat lain, mis. http://192.168.1.20:8787 */
+  urls: string[]
+  passwordSet: boolean
+  error?: string
 }
 
 export interface AutostartStatus {
@@ -133,6 +151,9 @@ export interface WallUiState {
   /** Banner darurat yang sedang aktif (null = tidak ada). */
   banner: LiveBanner | null
 }
+
+/** Cuplikan isi panel (JPEG data URL) per tileId, untuk pratinjau di Operator / kendali jarak jauh. */
+export type Thumbnails = Record<string, string>
 
 /** Perintah satu arah dari main ke UI wall. */
 export type WallCommand = { type: 'focusUrl'; tileId: string } | { type: 'notice'; kind: 'ok' | 'warn' | 'error'; text: string }

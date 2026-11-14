@@ -4,7 +4,7 @@ import type { ScheduleEntry } from '@shared/types'
 import { useOperator } from '../store'
 import { btn, CommitNumber, inputCls, labelCls, Pill, Row, Section, Switch } from './ui'
 
-const DAYS: Array<[number, string]> = [
+export const DAYS: Array<[number, string]> = [
   [1, 'Sen'],
   [2, 'Sel'],
   [3, 'Rab'],
@@ -14,16 +14,16 @@ const DAYS: Array<[number, string]> = [
   [0, 'Min']
 ]
 
-const pad = (n: number): string => String(n).padStart(2, '0')
+export const pad = (n: number): string => String(n).padStart(2, '0')
 
-function daysLabel(e: ScheduleEntry): string {
+export function daysLabel(e: Pick<ScheduleEntry, 'weekdays'>): string {
   if (!e.weekdays || e.weekdays.length === 7) return 'Setiap hari'
   return DAYS.filter(([d]) => e.weekdays?.includes(d))
     .map(([, l]) => l)
     .join(', ')
 }
 
-function DayPicker({ value, onChange }: { value: number[]; onChange: (days: number[]) => void }): React.JSX.Element {
+export function DayPicker({ value, onChange }: { value: number[]; onChange: (days: number[]) => void }): React.JSX.Element {
   return (
     <div className="flex gap-1">
       {DAYS.map(([d, l]) => {

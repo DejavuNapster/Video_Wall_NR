@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { STRIP_RATIO } from '@shared/panelGeometry'
 import type { LiveBanner } from '@shared/types'
 
@@ -12,8 +12,47 @@ import type { LiveBanner } from '@shared/types'
  * - Banner `pinned` tidak punya tombol tutup (hanya operator yang bisa menutup).
  * - Tombol tutup memanggil wallApi.closeBanner() → main menolak bila pinned.
  */
-export function BannerOverlay({ banner, top = 0 }: { banner: LiveBanner; /** Mode Atur: strip di bawah toolbar. */ top?: number }): React.JSX.Element {
+/** Sirene dua nada, tiga kali (±5 detik), lewat WebAudio. Mengembalikan fungsi untuk menghentikannya. */
+function playAlarm(): () => void {
+  const ctx = new AudioContext()
+  const t0 = ctx.currentTime + 0.05
+  for (let burst = 0; burst < 3; burst++) {
+    for (let beep = 0; beep < 4; beep++) {
+      const start = t0 + burst * 1.7 + beep * 0.3
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'square'
+      osc.frequency.value = beep % 2 === 0 ? 880 : 660
+      gain.gain.setValueAtTime(0.0001, start)
+      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(start)
+      osc.stop(start + 0.3)
+    }
+  }
+  const timer = setTimeout(() => void ctx.close(), 6000)
+  return () => {
+    clearTimeout(timer)
+    void ctx.close()
+  }
+}
+
+export function BannerOverlay({
+  banner,
+  top = 0,
+  playSound = false
+}: {
+  banner: LiveBanner
+  /** Mode Atur: strip di bawah toolbar. */
+  top?: number
+  /** Hanya satu jendela wall (monitor 1) yang membunyikan alarm, supaya tidak berlapis. */
+  playSound?: boolean
+}): React.JSX.Element {
   const [busy, setBusy] = useState(false)
+  const sound = playSound && banner.banner.sound
+  // Bunyi sekali setiap banner baru ditampilkan (setAt berubah), berhenti bila banner ditutup.
+  useEffect(() => (sound ? playAlarm() : undefined), [sound, banner.setAt])
   const [denied, setDenied] = useState<string | null>(null)
 
   const close = async (): Promise<void> => {

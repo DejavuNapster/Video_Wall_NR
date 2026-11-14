@@ -41,7 +41,9 @@ export function App(): React.JSX.Element | null {
   // Banner mode strip: area wall bergeser turun setinggi strip agar panel tak menumpuk di atasnya.
   const stripInset = state.banner && state.banner.banner.mode === 'strip' ? stripHeight(size) : 0
   const fullscreenPanel = state.panelFullscreenTileId !== null
-  const bannerEl = state.banner ? <BannerOverlay banner={state.banner} top={edit && !fullscreenPanel ? TOOLBAR_H : 0} /> : null
+  const bannerEl = state.banner ? (
+    <BannerOverlay banner={state.banner} top={edit && !fullscreenPanel ? TOOLBAR_H : 0} playSound={state.slot === 0} />
+  ) : null
   // Panel layar penuh menutupi seluruh jendela: tidak ada yang perlu digambar di lapisan UI.
   if (fullscreenPanel) return (
     <>

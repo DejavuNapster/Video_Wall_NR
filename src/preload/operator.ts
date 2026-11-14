@@ -20,7 +20,11 @@ const api: OperatorApi = {
   setBanner: (banner) => ipcRenderer.invoke(IPC.bannerSet, banner),
   clearBanner: () => ipcRenderer.invoke(IPC.bannerClear),
   backupExport: () => ipcRenderer.invoke(IPC.backupExport),
-  backupImport: () => ipcRenderer.invoke(IPC.backupImport)
+  backupImport: () => ipcRenderer.invoke(IPC.backupImport),
+  thumbnails: () => ipcRenderer.invoke(IPC.thumbnails),
+  setRemotePassword: (password) => ipcRenderer.invoke(IPC.setRemotePassword, password),
+  setTelegramToken: (token) => ipcRenderer.invoke(IPC.setTelegramToken, token),
+  testAlert: () => ipcRenderer.invoke(IPC.testAlert)
 }
 
 contextBridge.exposeInMainWorld('operatorApi', api)

@@ -1,4 +1,4 @@
-import type { AppState, Result, TileNavAction, VideoHeartbeat, VideoTileConfig, WallCommand, WallUiState } from './types'
+import type { AppState, Result, Thumbnails, TileNavAction, VideoHeartbeat, VideoTileConfig, WallCommand, WallUiState } from './types'
 
 /** Nama channel IPC. Satu sumber kebenaran agar main dan preload tidak beda ejaan. */
 export const IPC = {
@@ -15,6 +15,10 @@ export const IPC = {
   bannerClear: 'op:banner:clear',
   backupExport: 'op:backup:export',
   backupImport: 'op:backup:import',
+  thumbnails: 'op:thumbnails',
+  setRemotePassword: 'op:remote:password',
+  setTelegramToken: 'op:alert:telegram-token',
+  testAlert: 'op:alert:test',
   videoGetConfig: 'video:get-config',
   videoHeartbeat: 'video:heartbeat',
   wallGetState: 'wall:get-state',
@@ -83,6 +87,14 @@ export interface OperatorApi {
   backupExport(): Promise<Result<{ path: string }>>
   /** Pulihkan dari file backup (dialog buka) — divalidasi penuh sebelum diterapkan. */
   backupImport(): Promise<Result>
+  /** Cuplikan isi panel yang sedang tampil (JPEG kecil per tileId). */
+  thumbnails(): Promise<Thumbnails>
+  /** Password kendali jarak jauh (disimpan sebagai hash terenkripsi). Kosong = hapus. */
+  setRemotePassword(password: string): Promise<Result>
+  /** Token bot Telegram untuk peringatan (terenkripsi). Kosong = hapus. */
+  setTelegramToken(token: string): Promise<Result>
+  /** Kirim pesan uji ke saluran peringatan. */
+  testAlert(): Promise<Result>
 }
 
 /** API yang diekspos ke halaman pemutar video lokal. */

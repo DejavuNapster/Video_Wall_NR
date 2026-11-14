@@ -1,7 +1,61 @@
+import { useEffect, useState } from 'react'
 import { isNativeSource } from '@shared/native'
-import type { MonitorLayout, Tile, TileStatus } from '@shared/types'
+import { tileSummary } from '@shared/tileSummary'
+import type { MonitorLayout, Thumbnails, Tile, TileStatus } from '@shared/types'
 import { useOperator } from '../store'
 import { StatusDot, stateLabel } from './StatusDot'
+import { Switch } from './ui'
+
+const THUMB_INTERVAL_MS = 4000
+const PREVIEW_KEY = 'vwnr.livePreview'
+
+/** Pilihan "Pratinjau langsung" diingat per komputer (penyimpanan browser bisa tidak tersedia). */
+function usePreviewSetting(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(PREVIEW_KEY) !== 'off'
+    } catch {
+      return true
+    }
+  })
+  const update = (value: boolean): void => {
+    setOn(value)
+    try {
+      localStorage.setItem(PREVIEW_KEY, value ? 'on' : 'off')
+    } catch {
+      /* abaikan */
+    }
+  }
+  return [on, update]
+}
+
+/** Ambil cuplikan panel berkala selama jendela Operator terlihat. */
+function useThumbnails(enabled: boolean): Thumbnails {
+  const [thumbs, setThumbs] = useState<Thumbnails>({})
+  useEffect(() => {
+    if (!enabled) {
+      setThumbs({})
+      return
+    }
+    let alive = true
+    const load = async (): Promise<void> => {
+      if (document.hidden) return
+      try {
+        const next = await window.operatorApi.thumbnails()
+        if (alive && next && !('ok' in next)) setThumbs(next)
+      } catch {
+        /* coba lagi pada putaran berikutnya */
+      }
+    }
+    void load()
+    const timer = setInterval(() => void load(), THUMB_INTERVAL_MS)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [enabled])
+  return thumbs
+}
 
 export const SOURCE_LABEL: Record<Tile['source']['type'], string> = {
   empty: 'Kosong',
@@ -12,21 +66,6 @@ export const SOURCE_LABEL: Record<Tile['source']['type'], string> = {
   mjpeg: 'MJPEG',
   clock: 'Jam',
   ticker: 'Ticker'
-}
-
-/** Teks singkat isi panel: label, host URL, atau jenis sumber. */
-export function tileSummary(tile: Tile): string {
-  if (tile.label) return tile.label
-  const s = tile.source
-  if (s.type === 'empty') return 'Panel kosong'
-  if (s.type === 'ticker') return s.text
-  if (isNativeSource(s)) return 'Jam & tanggal'
-  try {
-    const u = new URL(s.url)
-    return `${u.host}${u.pathname === '/' ? '' : u.pathname}`
-  } catch {
-    return s.url
-  }
 }
 
 function tileTone(tile: Tile, status: TileStatus | undefined): string {
@@ -46,7 +85,17 @@ function tileTone(tile: Tile, status: TileStatus | undefined): string {
   }
 }
 
-function MonitorMap({ monitor, aspect, label }: { monitor: MonitorLayout; aspect: number; label: string }): React.JSX.Element {
+function MonitorMap({
+  monitor,
+  aspect,
+  label,
+  thumbs
+}: {
+  monitor: MonitorLayout
+  aspect: number
+  label: string
+  thumbs: Thumbnails
+}): React.JSX.Element {
   const app = useOperator((s) => s.app)
   const selected = useOperator((s) => s.selected)
   const select = useOperator((s) => s.select)
@@ -70,6 +119,7 @@ function MonitorMap({ monitor, aspect, label }: { monitor: MonitorLayout; aspect
         {monitor.tiles.map((tile) => {
           const status = app?.tileStatus[tile.id]
           const isSel = selected?.tileId === tile.id
+          const thumb = thumbs[tile.id]
           return (
             <button
               key={tile.id}
@@ -85,11 +135,13 @@ function MonitorMap({ monitor, aspect, label }: { monitor: MonitorLayout; aspect
                 height: `calc(${pct(tile.h, monitor.rows)} - 2px)`
               }}
             >
-              <span className="flex w-full items-center gap-1">
+              {thumb && <img src={thumb} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />}
+              <span className={`relative flex w-full items-center gap-1 ${thumb ? 'rounded bg-black/70 px-1 py-0.5' : ''}`}>
                 {status && tile.source.type !== 'empty' && !isNativeSource(tile.source) && <StatusDot state={status.state} />}
                 <span className="font-semibold opacity-80">{SOURCE_LABEL[tile.source.type]}</span>
+                {thumb && <span className="min-w-0 truncate opacity-90">{tileSummary(tile)}</span>}
               </span>
-              <span className="line-clamp-2 w-full break-all opacity-90">{tileSummary(tile)}</span>
+              {!thumb && <span className="line-clamp-2 w-full break-all opacity-90">{tileSummary(tile)}</span>}
             </button>
           )
         })}
@@ -105,6 +157,8 @@ function MonitorMap({ monitor, aspect, label }: { monitor: MonitorLayout; aspect
 export function MonitorOverview(): React.JSX.Element {
   const app = useOperator((s) => s.app)
   const { run } = useOperator.getState()
+  const [preview, setPreview] = usePreviewSetting()
+  const thumbs = useThumbnails(preview && !!app?.activePreset)
   if (!app?.activePreset) {
     return <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Belum ada preset aktif.</div>
   }
@@ -119,6 +173,10 @@ export function MonitorOverview(): React.JSX.Element {
           Klik panel untuk mengatur sumbernya di sebelah kanan. Tambah, geser, dan ubah ukuran panel dilakukan langsung di
           jendela wall pada <b className="text-slate-200">Mode Atur</b> (toolbar + bilah panel).
         </span>
+        <label className="flex items-center gap-2 text-slate-300" title="Cuplikan isi panel diperbarui setiap beberapa detik">
+          <Switch label="Pratinjau langsung" checked={preview} onChange={setPreview} />
+          Pratinjau langsung
+        </label>
         {displayMode && (
           <button
             className="rounded-md bg-sky-600 px-3 py-1.5 font-medium text-white hover:bg-sky-500"
@@ -138,7 +196,7 @@ export function MonitorOverview(): React.JSX.Element {
           const d = wallDisplays.find((x) => x.slot === m.slot)
           const aspect = d ? d.bounds.width / d.bounds.height : 16 / 9
           const label = d ? `${d.bounds.width}×${d.bounds.height}${d.virtual ? ' (virtual)' : ''}` : ''
-          return <MonitorMap key={m.slot} monitor={m} aspect={aspect} label={label} />
+          return <MonitorMap key={m.slot} monitor={m} aspect={aspect} label={label} thumbs={thumbs} />
         })}
       </div>
     </div>

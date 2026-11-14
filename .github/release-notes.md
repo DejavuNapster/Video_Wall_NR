@@ -45,3 +45,6 @@ lalu buka seperti biasa (atau klik-kanan → *Open*).
 - Jendela wall tampil layar penuh di setiap monitor; jendela **Operator** untuk preset, rotasi/jadwal, banner, dan pengaturan.
 - **Ctrl+E** Mode Atur / Mode Tampil · **Ctrl+Alt+O** tampilkan Operator · **Ctrl+Alt+W** tampilkan wall · **Ctrl+Alt+Q** keluar.
 - Panel web berperilaku seperti tab browser: ← → ⟳ ⌂ dan ⧉ buka di panel baru.
+- Panel web dapat menampilkan beberapa dashboard bergantian dan diberi CSS khusus (sembunyikan header/menu).
+- Operator menampilkan pratinjau langsung setiap panel; banner bisa disimpan sebagai templat, dijadwalkan, dan diberi bunyi alarm.
+- Peringatan otomatis ke webhook/Telegram bila panel bermasalah, serta kendali jarak jauh lewat browser di jaringan lokal (Operator › Pengaturan).

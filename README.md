@@ -140,16 +140,48 @@ keluar). Kelola preset, rotasi, dan pengaturan aplikasi ada di jendela Operator.
 Dibuka otomatis saat aplikasi mulai (kecuali `--hide-operator`), lewat menu ☰ di wall, atau **Ctrl+Alt+O**.
 
 - **Sidebar Preset**: klik untuk menampilkan di wall · + Baru · ganti nama / Duplikat / Hapus preset aktif.
-- **Monitor & Panel**: peta isi setiap monitor dengan status panel (berjalan / gagal / beku). Klik panel untuk
-  membuka **Inspector**: label, jenis sumber (web, RTSP, HLS, WHEP, MJPEG, jam, teks berjalan), URL, zoom,
-  muat ulang otomatis, abaikan sertifikat, transport + username + password RTSP (terenkripsi), muat ulang, hapus.
+- **Monitor & Panel**: peta isi setiap monitor dengan status panel (berjalan / gagal / beku) dan **pratinjau
+  langsung** (cuplikan isi panel, diperbarui tiap ±4 detik; bisa dimatikan). Klik panel untuk membuka
+  **Inspector**: label, jenis sumber (web, RTSP, HLS, WHEP, MJPEG, jam, teks berjalan), URL, zoom, muat ulang
+  otomatis, abaikan sertifikat, transport + username + password RTSP (terenkripsi), muat ulang, hapus.
+  Khusus panel web:
+  - **Rotasi halaman**: beberapa dashboard bergantian di satu panel (satu URL per baris, interval dalam detik).
+  - **CSS khusus**: disuntikkan ke setiap halaman panel untuk menyembunyikan header, menu, scrollbar, atau
+    pop-up cookie. Diterapkan tanpa memuat ulang halaman; tersedia potongan CSS siap pakai.
+
   Posisi/ukuran panel diatur di wall (Mode Atur).
 - **Otomatisasi**: rotasi preset (interval, hanya di Mode Tampil) dan jadwal preset per jam + hari. Selama ada
   jadwal aktif, rotasi dijeda.
-- **Banner**: tema (Darurat, Peringatan, Info, Netral — warna + judul bawaan), judul (bisa diubah/dikosongkan), teks, layar penuh / strip atas, durasi, warna, kunci (tidak bisa ditutup dari wall).
+- **Banner**: tema (Darurat, Peringatan, Info, Netral — warna + judul bawaan), judul (bisa diubah/dikosongkan),
+  teks, layar penuh / strip atas, durasi, warna, **bunyi alarm** (sirene ±5 detik dari monitor 1), kunci (tidak
+  bisa ditutup dari wall). Banner bisa disimpan sebagai **templat** lalu ditampilkan dengan satu klik atau
+  **dijadwalkan** per jam + hari (mis. pengingat rapat).
 - **Pengaturan**: jalan otomatis saat login, monitor utama untuk Operator, abaikan sertifikat (semua panel),
   pemulihan otomatis (muat ulang berkala, deteksi video beku, batas memori), relay RTSP (MediaMTX),
-  **backup & pulihkan** (semua preset + pengaturan dalam satu file JSON; password RTSP tidak ikut).
+  **peringatan panel bermasalah**, **kendali jarak jauh**, dan **backup & pulihkan** (semua preset + pengaturan
+  dalam satu file JSON; password RTSP, password kendali jarak jauh, dan token Telegram tidak ikut).
+
+### Peringatan panel bermasalah
+
+Bila sebuah panel gagal tampil (gagal dimuat, crash, video beku, tidak merespons) terus-menerus melewati batas
+waktu (bawaan 5 menit), aplikasi mengirim pesan ke:
+
+- **Webhook**: `POST` JSON `{ text, content, app, version, host, event, tileId, durationMs }`. Kolom `text`
+  dipakai Slack/Google Chat, `content` dipakai Discord; n8n/Make/server sendiri bisa membaca semuanya.
+- **Telegram**: isi chat ID (grup/kanal) dan token bot dari @BotFather; bot harus sudah ada di grup tersebut.
+
+Pesan memuat nama panel, nomor monitor, dan nama komputer. Saat panel pulih, pesan pulih dikirim (bisa
+dimatikan). Gunakan **Kirim pesan uji** untuk memeriksa saluran.
+
+### Kendali jarak jauh
+
+Operasikan wall dari ponsel atau komputer lain di jaringan yang sama melalui browser: ganti preset, Mode
+Tampil / Mode Atur, rotasi preset, tampilkan templat banner atau banner cepat, tutup banner, lihat pratinjau
+setiap panel, dan muat ulang panel.
+
+1. Operator › Pengaturan › **Kendali jarak jauh**: atur password (minimal 8 karakter), lalu aktifkan.
+2. Buka alamat yang ditampilkan (mis. `http://192.168.1.20:8787`) dari perangkat lain dan masuk dengan password.
+3. Saat pertama kali diaktifkan, Windows meminta izin firewall: pilih **Private networks**.
 
 | Shortcut (di jendela wall) | Fungsi |
 | --- | --- |
@@ -246,7 +278,13 @@ Data dari nama lama (`Video Wall Browser`) dipindahkan otomatis saat versi baru 
   memakai **Abaikan error sertifikat** (per panel, atau untuk semua panel lewat menu ⚙ wall; setara
   "Proceed anyway" di Chrome, mis. untuk server yang diakses lewat IP). Panel dengan opsi ini memakai session
   terpisah (`persist:tile-<id>-insecure`), sehingga login perlu diulang sekali setelah opsi diubah.
-- Password RTSP disimpan terenkripsi (safeStorage), tidak ada di berkas preset/ekspor.
+- Password RTSP dan token bot Telegram disimpan terenkripsi (safeStorage), tidak ada di berkas preset/ekspor.
+- Kendali jarak jauh: mati secara bawaan; password disimpan sebagai hash scrypt (terenkripsi safeStorage); sesi
+  lewat cookie `HttpOnly` + `SameSite=Strict` (berlaku 12 jam, hilang saat password diganti atau aplikasi
+  ditutup); setiap `POST` wajib membawa header khusus (perlindungan CSRF); login dikunci 60 detik setelah 5 kali
+  gagal; CSP ketat dan semua masukan divalidasi zod. Koneksi berupa HTTP biasa (tidak terenkripsi), jadi
+  gunakan hanya di jaringan lokal tepercaya.
+- CSS khusus panel hanya mengubah tampilan halaman di panel itu (disuntikkan lewat `insertCSS`, tanpa JavaScript).
 - MediaMTX: hanya `127.0.0.1`, akses anonim hanya `read`, API memakai token acak per sesi.
 - CSP disuntikkan pada build produksi (varian operator — juga dipakai UI wall — dan video).
 

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Video Wall NR - Kendali</title>
+    <link rel="stylesheet" href="/remote.css" />
+  </head>
+  <body>
+    <form id="login" class="login" hidden>
+      <h1>Video Wall NR</h1>
+      <p class="muted">Kendali jarak jauh</p>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required />
+      <button type="submit" class="primary">Masuk</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+
+    <main id="app" hidden>
+      <header class="top">
+        <div>
+          <h1>Video Wall NR</h1>
+          <p id="host" class="muted"></p>
+        </div>
+        <button id="logout" type="button" class="ghost">Keluar</button>
+      </header>
+
+      <section>
+        <h2>Tampilan</h2>
+        <div class="row">
+          <button id="display-mode" type="button"></button>
+          <button id="rotation" type="button"></button>
+        </div>
+        <p id="schedule-note" class="muted small" hidden>Jadwal preset aktif: rotasi dijeda selama ada jadwal.</p>
+      </section>
+
+      <section>
+        <h2>Preset</h2>
+        <div id="presets" class="chips"></div>
+      </section>
+
+      <section>
+        <h2>Banner</h2>
+        <div id="banner-live" class="banner-live" hidden>
+          <div>
+            <strong id="banner-live-text"></strong>
+            <p id="banner-live-info" class="muted small"></p>
+          </div>
+          <button id="banner-clear" type="button" class="danger">Tutup banner</button>
+        </div>
+        <div id="templates" class="chips"></div>
+        <details>
+          <summary>Banner cepat</summary>
+          <form id="quick-banner" class="stack">
+            <label for="qb-theme">Tema</label>
+            <select id="qb-theme"></select>
+            <label for="qb-text">Teks pengumuman</label>
+            <textarea id="qb-text" rows="3" maxlength="500" required></textarea>
+            <label for="qb-duration">Lama tampil</label>
+            <select id="qb-duration">
+              <option value="60">1 menit</option>
+              <option value="300" selected>5 menit</option>
+              <option value="900">15 menit</option>
+              <option value="3600">1 jam</option>
+              <option value="0">Sampai ditutup</option>
+            </select>
+            <label class="check"><input id="qb-strip" type="checkbox" /> Strip atas (panel tetap terlihat)</label>
+            <label class="check"><input id="qb-sound" type="checkbox" /> Bunyikan alarm</label>
+            <button type="submit" class="primary">Tampilkan di wall</button>
+          </form>
+        </details>
+      </section>
+
+      <section>
+        <h2>Panel</h2>
+        <div id="monitors"></div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script src="/remote.js"></script>
+  </body>
+</html>

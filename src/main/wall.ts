@@ -14,6 +14,7 @@ import type {
   Settings,
   Tile,
   TileNavAction,
+  Thumbnails,
   TileStatus,
   VideoTileConfig,
   WallCommand,
@@ -29,6 +30,10 @@ import { TileView, type TileContext } from './tiles'
 import { WallUiView } from './wallUi'
 
 const log = createLogger('wall')
+
+/** Lebar cuplikan panel (px) dan berapa lama satu set cuplikan dipakai bersama (Operator + kendali jarak jauh). */
+const THUMB_WIDTH = 360
+const THUMB_TTL_MS = 3_000
 
 /** Tile dengan status ini disembunyikan supaya pesan error + tombol "Coba lagi" di UI wall terlihat. */
 const HIDDEN_STATES = new Set(['failed', 'crashed'])
@@ -89,6 +94,8 @@ export class WallController extends EventEmitter {
   private uiTimer: NodeJS.Timeout | null = null
   private actions: WallActions | null = null
   private readonly tileCtx: TileContext
+  private thumbCache: { at: number; data: Thumbnails } | null = null
+  private thumbPending: Promise<Thumbnails> | null = null
 
   constructor(private readonly deps: WallDeps) {
     super()
@@ -181,15 +188,28 @@ export class WallController extends EventEmitter {
     }
   }
 
-  reloadTile(tileId: string): boolean {
+  /** Cuplikan JPEG kecil dari semua panel yang sedang terlihat. Hasil dipakai bersama selama beberapa detik. */
+  captureThumbnails(): Promise<Thumbnails> {
+    if (this.thumbCache && Date.now() - this.thumbCache.at < THUMB_TTL_MS) return Promise.resolve(this.thumbCache.data)
+    this.thumbPending ??= this.doCaptureThumbnails().finally(() => {
+      this.thumbPending = null
+    })
+    return this.thumbPending
+  }
+
+  /** Cari panel di semua monitor. */
+  findTile(tileId: string): TileView | null {
     for (const ww of this.windows.values()) {
       const tv = ww.tiles.get(tileId)
-      if (tv) {
-        tv.reload('diminta operator')
-        return true
-      }
+      if (tv) return tv
     }
-    return false
+    return null
+  }
+
+  reloadTile(tileId: string): boolean {
+    const tv = this.findTile(tileId)
+    tv?.reload('diminta operator')
+    return tv !== null
   }
 
   // ---------------------------------------------------------------- API untuk UI wall (per monitor)
@@ -209,7 +229,7 @@ export class WallController extends EventEmitter {
       case 'forward':
         return tv.navigate(action) ? { ok: true } : { ok: false, error: action === 'back' ? 'Tidak ada halaman sebelumnya' : 'Tidak ada halaman berikutnya' }
       case 'home':
-        tv.reload('kembali ke URL panel')
+        tv.goHome()
         return { ok: true }
       case 'newPanel': {
         const url = tv.pageUrl || tv.tile.source.url
@@ -294,6 +314,32 @@ export class WallController extends EventEmitter {
   }
 
   // ---------------------------------------------------------------- internal
+
+  private async doCaptureThumbnails(): Promise<Thumbnails> {
+    const out: Thumbnails = {}
+    const jobs: Promise<void>[] = []
+    for (const ww of this.windows.values()) {
+      if (ww.win.isDestroyed() || ww.win.isMinimized()) continue
+      for (const tv of ww.tiles.values()) {
+        const wc = tv.view.webContents
+        if (wc.isDestroyed() || !tv.view.getVisible()) continue
+        jobs.push(
+          wc
+            .capturePage()
+            .then((img) => {
+              if (img.isEmpty()) return
+              const small = img.getSize().width > THUMB_WIDTH ? img.resize({ width: THUMB_WIDTH, quality: 'good' }) : img
+              out[tv.tile.id] = `data:image/jpeg;base64,${small.toJPEG(60).toString('base64')}`
+            })
+            .catch(() => undefined)
+        )
+      }
+    }
+    await Promise.all(jobs)
+    // Hasil kosong (panel baru mulai dimuat) tidak disimpan supaya permintaan berikutnya langsung mencoba lagi.
+    this.thumbCache = Object.keys(out).length > 0 ? { at: Date.now(), data: out } : null
+    return out
+  }
 
   private buildUiState(ww: WallWindow): WallUiState {
     const settings = this.deps.getSettings()

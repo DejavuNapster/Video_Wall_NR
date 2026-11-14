@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ScheduleEntrySchema } from './schema'
+import { AlertSettingsPatchSchema, BannerScheduleEntrySchema, BannerTemplateSchema, RemoteSettingsPatchSchema, ScheduleEntrySchema } from './schema'
 import type { Settings } from './types'
 
 const presetId = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/)
@@ -51,22 +51,28 @@ export const SettingsPatchSchema = z
         schedule: ScheduleEntrySchema.array().max(48)
       })
       .partial()
-      .strict()
+      .strict(),
+    bannerTemplates: BannerTemplateSchema.array().max(50),
+    bannerSchedule: BannerScheduleEntrySchema.array().max(48),
+    alerts: AlertSettingsPatchSchema,
+    remote: RemoteSettingsPatchSchema
   })
   .partial()
   .strict()
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>
 
 /**
- * Gabungkan patch ke pengaturan sekarang (`wall`, `wall.rotation`, dan `mediaMtx` digabung, bukan diganti).
+ * Gabungkan patch ke pengaturan sekarang (`wall`, `wall.rotation`, `mediaMtx`, `alerts`, dan `remote` digabung, bukan diganti).
  * `autostart` diabaikan di sini: itu pengaturan OS, bukan isi settings.json.
  */
 export function mergeSettings(cur: Settings, patch: SettingsPatch): Settings {
-  const { autostart: _autostart, mediaMtxEnabled, excludePrimaryFromWall, wall, ...rest } = patch
+  const { autostart: _autostart, mediaMtxEnabled, excludePrimaryFromWall, wall, alerts, remote, ...rest } = patch
   const next: Settings = { ...cur, ...rest }
   if (excludePrimaryFromWall === null) delete next.excludePrimaryFromWall
   else if (excludePrimaryFromWall !== undefined) next.excludePrimaryFromWall = excludePrimaryFromWall
   if (mediaMtxEnabled !== undefined) next.mediaMtx = { ...cur.mediaMtx, enabled: mediaMtxEnabled }
+  if (alerts) next.alerts = { ...cur.alerts, ...alerts }
+  if (remote) next.remote = { ...cur.remote, ...remote }
   if (wall) {
     const { rotation, ...wallRest } = wall
     next.wall = { ...cur.wall, ...wallRest, rotation: { ...cur.wall.rotation, ...rotation } }

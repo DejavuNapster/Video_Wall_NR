@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { defaultSource } from '@shared/editor'
 import { isNativeSource } from '@shared/native'
 import type { Source, Tile } from '@shared/types'
+import { CSS_SNIPPETS } from '@shared/webPanel'
 import { useOperator } from '../store'
 import { SOURCE_LABEL } from './MonitorOverview'
 import { StatusDot, stateLabel } from './StatusDot'
@@ -158,6 +159,8 @@ export function Inspector(): React.JSX.Element {
           </div>
         )}
 
+        {src.type === 'web' && <WebExtras src={src} onChange={setSource} />}
+
         {src.type !== 'empty' && src.type !== 'rtsp' && !isNativeSource(src) && (
           <Check checked={src.ignoreCertErrors === true} onChange={(value) => edit({ op: 'setIgnoreCert', value })}>
             Abaikan error sertifikat HTTPS
@@ -269,5 +272,87 @@ export function Inspector(): React.JSX.Element {
         </button>
       </div>
     </aside>
+  )
+}
+
+type WebSource = Extract<Source, { type: 'web' }>
+
+/** Opsi khusus panel web: rotasi beberapa halaman dan CSS tambahan untuk merapikan dashboard. */
+function WebExtras({ src, onChange }: { src: WebSource; onChange: (source: Source) => void }): React.JSX.Element {
+  const { setNotice } = useOperator.getState()
+  const { cycle: _cycle, css: _css, ...base } = src
+  const withCycle = (cycle: WebSource['cycle']): void => onChange(cycle ? { ...base, ...(src.css ? { css: src.css } : {}), cycle } : { ...base, ...(src.css ? { css: src.css } : {}) })
+  const withCss = (css: string): void => onChange({ ...base, ...(src.cycle ? { cycle: src.cycle } : {}), ...(css.trim() ? { css } : {}) })
+
+  const commitUrls = (text: string): void => {
+    const urls = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => (/^[a-z][a-z0-9+.-]*:\/\//i.test(l) ? l : `http://${l}`))
+    const bad = urls.find((u) => !/^https?:\/\/[^\s]+$/i.test(u))
+    if (bad) return setNotice({ kind: 'error', text: `URL tidak valid: ${bad}` })
+    if (urls.length > 20) return setNotice({ kind: 'error', text: 'Maksimal 20 halaman tambahan' })
+    withCycle(urls.length ? { urls, intervalSec: src.cycle?.intervalSec ?? 60 } : undefined)
+  }
+
+  return (
+    <>
+      <Field
+        label="Rotasi halaman"
+        hint={
+          src.cycle
+            ? `${src.cycle.urls.length + 1} halaman bergantian (URL di atas + ${src.cycle.urls.length} halaman tambahan).`
+            : 'Isi halaman tambahan (satu URL per baris) agar panel ini menampilkan beberapa dashboard bergantian.'
+        }
+      >
+        <CommitText
+          multiline
+          spellCheck={false}
+          className={`${inputCls} min-h-20 font-mono text-xs`}
+          placeholder={'https://dashboard-2.contoh.id\nhttps://dashboard-3.contoh.id'}
+          value={src.cycle?.urls.join('\n') ?? ''}
+          onCommit={commitUrls}
+        />
+        {src.cycle && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-xs text-slate-400">Ganti halaman setiap</span>
+            <CommitNumber
+              value={src.cycle.intervalSec}
+              min={5}
+              max={86_400}
+              className={`${inputCls} w-24`}
+              onCommit={(intervalSec) => src.cycle && withCycle({ ...src.cycle, intervalSec })}
+            />
+            <span className="text-xs text-slate-400">detik</span>
+          </div>
+        )}
+      </Field>
+
+      <Field label="CSS khusus" hint="Disuntikkan ke setiap halaman panel ini, mis. untuk menyembunyikan header, menu, atau pop-up. Tanpa memuat ulang halaman.">
+        <CommitText
+          multiline
+          spellCheck={false}
+          maxLength={20_000}
+          className={`${inputCls} min-h-24 font-mono text-xs`}
+          placeholder={'.navbar { display: none !important; }'}
+          value={src.css ?? ''}
+          onCommit={withCss}
+        />
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {CSS_SNIPPETS.map((snip) => (
+            <button
+              key={snip.label}
+              type="button"
+              className={`${btn.secondary} px-2 py-1 text-[11px]`}
+              disabled={(src.css ?? '').includes(snip.css)}
+              onClick={() => withCss([src.css?.trim(), snip.css].filter(Boolean).join('\n'))}
+            >
+              + {snip.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </>
   )
 }

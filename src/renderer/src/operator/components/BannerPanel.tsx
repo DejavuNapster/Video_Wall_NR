@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { BannerMode, EmergencyBanner } from '@shared/types'
+import { BANNER_THEMES } from '@shared/bannerThemes'
+import { slugify, uniqueId } from '@shared/editor'
+import type { BannerMode, BannerTemplate, EmergencyBanner } from '@shared/types'
 import { useOperator } from '../store'
-import { inputCls, labelCls, Section, Switch } from './ui'
+import { DAYS, DayPicker, daysLabel, pad } from './AutomationPanel'
+import { btn, inputCls, labelCls, Section, Switch } from './ui'
 
 const DURATIONS: Array<[number, string]> = [
   [60, '1 menit'],
@@ -12,13 +15,7 @@ const DURATIONS: Array<[number, string]> = [
   [0, 'Sampai ditutup']
 ]
 
-/** Tema = warna + judul bawaan yang sesuai sifat pengumumannya. */
-const THEMES: Array<{ label: string; title: string; bg: string; fg: string }> = [
-  { label: 'Darurat', title: 'Pengumuman Darurat', bg: '#b91c1c', fg: '#ffffff' },
-  { label: 'Peringatan', title: 'Peringatan', bg: '#f59e0b', fg: '#111827' },
-  { label: 'Info', title: 'Informasi', bg: '#1d4ed8', fg: '#ffffff' },
-  { label: 'Netral', title: 'Pengumuman', bg: '#0f172a', fg: '#f8fafc' }
-]
+const THEMES = BANNER_THEMES
 const DEFAULT_THEME = THEMES[0]!
 
 function remaining(setAt: number, durationSec: number, now: number): string {
@@ -41,6 +38,8 @@ export function BannerPanel(): React.JSX.Element | null {
   const [durationSec, setDurationSec] = useState(300)
   const [pinned, setPinned] = useState(false)
   const [mode, setMode] = useState<BannerMode>('cover')
+  const [sound, setSound] = useState(false)
+  const [templateName, setTemplateName] = useState('')
   const [now, setNow] = useState(() => Date.now())
   const live = app?.banner ?? null
 
@@ -52,11 +51,36 @@ export function BannerPanel(): React.JSX.Element | null {
 
   if (!app) return null
   const valid = text.trim().length > 0
+  const templates = app.settings.bannerTemplates
 
+  const current = (): EmergencyBanner => ({ title: title.trim(), text: text.trim(), bgColor, fgColor, fontSize, durationSec, pinned, mode, sound })
   const show = (): void => {
     if (!valid) return
-    const banner: EmergencyBanner = { title: title.trim(), text: text.trim(), bgColor, fgColor, fontSize, durationSec, pinned, mode }
+    const banner = current()
     void run((api) => api.setBanner(banner), 'Banner ditampilkan di semua monitor wall')
+  }
+  /** Isi formulir dari templat. */
+  const fill = (b: EmergencyBanner): void => {
+    setTitle(b.title)
+    setText(b.text)
+    setBgColor(b.bgColor)
+    setFgColor(b.fgColor)
+    setFontSize(b.fontSize)
+    setDurationSec(b.durationSec)
+    setPinned(b.pinned)
+    setMode(b.mode)
+    setSound(b.sound)
+  }
+  const saveTemplate = (): void => {
+    const name = templateName.trim() || text.trim().slice(0, 60)
+    if (!valid || !name) return
+    const existing = templates.find((t) => t.name.toLowerCase() === name.toLowerCase())
+    const next: BannerTemplate[] = existing
+      ? templates.map((t) => (t.id === existing.id ? { ...t, banner: current() } : t))
+      : [...templates, { id: uniqueId(slugify(name), templates.map((t) => t.id)), name, banner: current() }]
+    void run((api) => api.updateSettings({ bannerTemplates: next }), existing ? `Templat "${name}" diperbarui` : `Templat "${name}" disimpan`).then((r) => {
+      if (r.ok) setTemplateName('')
+    })
   }
 
   return (
@@ -169,6 +193,14 @@ export function BannerPanel(): React.JSX.Element | null {
         </label>
 
         <div className="flex items-center gap-3">
+          <Switch label="Bunyikan alarm" checked={sound} onChange={setSound} />
+          <div className="text-sm text-slate-300">
+            Bunyikan alarm
+            <span className="block text-xs text-slate-500">Sirene singkat (±5 detik) dari speaker komputer wall saat banner muncul.</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
           <Switch label="Kunci banner" checked={pinned} onChange={setPinned} />
           <div className="text-sm text-slate-300">
             Kunci banner
@@ -186,12 +218,148 @@ export function BannerPanel(): React.JSX.Element | null {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <input
+            className={`${inputCls} w-56`}
+            maxLength={60}
+            placeholder="Nama templat (opsional)"
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+          />
+          <button className={btn.secondary} disabled={!valid || busy} onClick={saveTemplate} title="Simpan isi formulir ini agar bisa dipakai ulang atau dijadwalkan">
+            Simpan sebagai templat
+          </button>
           <button className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-40" disabled={!valid || busy} onClick={show}>
             {live ? 'Ganti banner' : 'Tampilkan di wall'}
           </button>
         </div>
       </Section>
+
+      <TemplateList templates={templates} onFill={fill} />
+      <BannerSchedule templates={templates} />
     </div>
+  )
+}
+
+function TemplateList({ templates, onFill }: { templates: BannerTemplate[]; onFill: (b: EmergencyBanner) => void }): React.JSX.Element {
+  const app = useOperator((s) => s.app)
+  const { run } = useOperator.getState()
+  const remove = (t: BannerTemplate): void => {
+    const used = app?.settings.bannerSchedule.some((e) => e.templateId === t.id)
+    if (!window.confirm(`Hapus templat "${t.name}"?${used ? '\nJadwal yang memakai templat ini juga dihapus.' : ''}`)) return
+    void run(
+      (api) =>
+        api.updateSettings({
+          bannerTemplates: templates.filter((x) => x.id !== t.id),
+          bannerSchedule: (app?.settings.bannerSchedule ?? []).filter((e) => e.templateId !== t.id)
+        }),
+      'Templat dihapus'
+    )
+  }
+  return (
+    <Section title="Templat banner" description="Banner tersimpan untuk ditampilkan dengan satu klik, dijadwalkan, atau dipakai dari kendali jarak jauh.">
+      {templates.length === 0 ? (
+        <p className="text-sm text-slate-500">Belum ada templat. Isi formulir di atas, lalu klik "Simpan sebagai templat".</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {templates.map((t) => (
+            <li key={t.id} className="flex flex-wrap items-center gap-2 rounded-md border border-slate-800 bg-slate-950 px-3 py-2">
+              <span className="h-5 w-5 shrink-0 rounded" style={{ backgroundColor: t.banner.bgColor }} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm text-slate-200">{t.name}</div>
+                <div className="truncate text-xs text-slate-500">
+                  {t.banner.title ? `${t.banner.title}: ` : ''}
+                  {t.banner.text}
+                </div>
+              </div>
+              <button className={`${btn.ghost} px-2 py-1 text-xs`} onClick={() => onFill(t.banner)}>
+                Isi formulir
+              </button>
+              <button className={`${btn.secondary} px-2 py-1 text-xs`} onClick={() => void run((api) => api.setBanner(t.banner), `Banner "${t.name}" ditampilkan`)}>
+                Tampilkan
+              </button>
+              <button className={`${btn.danger} px-2 py-1 text-xs`} onClick={() => remove(t)}>
+                Hapus
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  )
+}
+
+function BannerSchedule({ templates }: { templates: BannerTemplate[] }): React.JSX.Element {
+  const app = useOperator((s) => s.app)
+  const { run } = useOperator.getState()
+  const [templateId, setTemplateId] = useState('')
+  const [time, setTime] = useState('13:00')
+  const [days, setDays] = useState<number[]>(DAYS.map(([d]) => d))
+  const entries = app?.settings.bannerSchedule ?? []
+  const chosen = templates.some((t) => t.id === templateId) ? templateId : (templates[0]?.id ?? '')
+  const save = (next: typeof entries, okText?: string): void => void run((api) => api.updateSettings({ bannerSchedule: next }), okText)
+
+  const add = (): void => {
+    const [h, m] = time.split(':').map(Number)
+    if (!chosen || h === undefined || m === undefined || Number.isNaN(h) || Number.isNaN(m) || days.length === 0) return
+    const id = uniqueId(`b-${pad(h)}${pad(m)}`, entries.map((e) => e.id))
+    const entry = { id, templateId: chosen, hour: h, minute: m, enabled: true, ...(days.length < 7 ? { weekdays: [...days].sort() } : {}) }
+    const next = [...entries, entry].sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))
+    save(next, 'Jadwal banner ditambahkan')
+  }
+
+  return (
+    <Section title="Jadwal banner" description="Tampilkan templat banner secara otomatis pada jam tertentu, mis. pengingat rapat atau jam istirahat.">
+      {templates.length === 0 ? (
+        <p className="text-sm text-slate-500">Simpan minimal satu templat untuk membuat jadwal.</p>
+      ) : (
+        <div className="flex flex-wrap items-end gap-3">
+          <label>
+            <span className={labelCls}>Templat</span>
+            <select className={`${inputCls} w-52`} value={chosen} onChange={(e) => setTemplateId(e.target.value)}>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className={labelCls}>Jam</span>
+            <input type="time" className={`${inputCls} w-28`} value={time} onChange={(e) => setTime(e.target.value)} />
+          </label>
+          <div>
+            <span className={labelCls}>Hari</span>
+            <DayPicker value={days} onChange={setDays} />
+          </div>
+          <button className={btn.primary} disabled={days.length === 0} onClick={add}>
+            Tambah jadwal
+          </button>
+        </div>
+      )}
+      {entries.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-2">
+          {entries.map((e) => (
+            <li key={e.id} className="flex items-center gap-3 rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm">
+              <Switch
+                label="Aktif"
+                checked={e.enabled}
+                onChange={(enabled) => save(entries.map((x) => (x.id === e.id ? { ...x, enabled } : x)))}
+              />
+              <span className="w-12 font-mono text-slate-200">
+                {pad(e.hour)}:{pad(e.minute)}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-slate-300">
+                {templates.find((t) => t.id === e.templateId)?.name ?? `(templat "${e.templateId}" tidak ada)`}
+              </span>
+              <span className="text-xs text-slate-500">{daysLabel(e)}</span>
+              <button className={`${btn.danger} px-2 py-1 text-xs`} onClick={() => save(entries.filter((x) => x.id !== e.id), 'Jadwal banner dihapus')}>
+                Hapus
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   )
 }

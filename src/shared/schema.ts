@@ -29,7 +29,16 @@ export const SourceSchema = z.discriminatedUnion('type', [
     url: httpUrl,
     zoom: z.number().min(0.25).max(5).default(1),
     reloadMinutes: z.number().int().min(0).max(10080).default(0),
-    ignoreCertErrors
+    ignoreCertErrors,
+    /** CSS tambahan yang disuntikkan ke setiap halaman panel (mis. menyembunyikan header/menu dashboard). */
+    css: z.string().max(20_000).optional(),
+    /** Rotasi halaman di panel ini: `url` lalu `urls` bergantian setiap `intervalSec` detik. */
+    cycle: z
+      .object({
+        urls: z.array(httpUrl).min(1).max(20),
+        intervalSec: z.number().int().min(5).max(86_400).default(60)
+      })
+      .optional()
   }),
   z.object({
     type: z.literal('rtsp'),
@@ -78,8 +87,70 @@ export const EmergencyBannerSchema = z.object({
   durationSec: z.number().int().min(0).max(86_400).default(300),
   pinned: z.boolean().default(false),
   /** 'cover' = tutupi seluruh wall (default); 'strip' = strip atas, tile tetap terlihat di bawahnya. */
-  mode: z.enum(['cover', 'strip']).default('cover')
+  mode: z.enum(['cover', 'strip']).default('cover'),
+  /** Bunyikan alarm saat banner muncul (dari jendela wall monitor 1). */
+  sound: z.boolean().default(false)
 })
+
+/** Banner tersimpan yang bisa ditampilkan ulang (dari Operator, jadwal, atau kendali jarak jauh). */
+export const BannerTemplateSchema = z.object({
+  id: idString,
+  name: z.string().trim().min(1).max(60),
+  banner: EmergencyBannerSchema
+})
+
+/** Jadwal banner berbasis jam: templat `templateId` ditampilkan pada jam+menit (dan hari) yang cocok. */
+export const BannerScheduleEntrySchema = z.object({
+  id: idString,
+  templateId: idString,
+  hour: z.number().int().min(0).max(23),
+  minute: z.number().int().min(0).max(59),
+  enabled: z.boolean().default(true),
+  weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional()
+})
+
+/**
+ * Peringatan saat panel bermasalah. Token bot Telegram TIDAK disimpan di sini (terenkripsi di vault).
+ * - `afterMinutes`   : panel harus bermasalah terus-menerus selama ini sebelum peringatan dikirim.
+ * - `notifyRecovery` : kirim pesan lagi saat panel pulih.
+ * - `webhookUrl`     : POST JSON `{ text, content, ... }` (cocok untuk Slack, Discord, Google Chat, n8n, dsb.).
+ */
+const alertFields = {
+  enabled: z.boolean(),
+  afterMinutes: z.number().int().min(1).max(1440),
+  notifyRecovery: z.boolean(),
+  webhookUrl: z.union([z.literal(''), httpUrl]),
+  telegramChatId: z
+    .string()
+    .trim()
+    .regex(/^(-?\d{1,20}|@[A-Za-z0-9_]{5,64})?$/, 'Chat ID Telegram berupa angka (mis. -1001234567890) atau @namakanal')
+}
+export const ALERT_SETTINGS_DEFAULT = { enabled: false, afterMinutes: 5, notifyRecovery: true, webhookUrl: '', telegramChatId: '' }
+export const AlertSettingsSchema = z.object({
+  enabled: alertFields.enabled.default(ALERT_SETTINGS_DEFAULT.enabled),
+  afterMinutes: alertFields.afterMinutes.default(ALERT_SETTINGS_DEFAULT.afterMinutes),
+  notifyRecovery: alertFields.notifyRecovery.default(ALERT_SETTINGS_DEFAULT.notifyRecovery),
+  webhookUrl: alertFields.webhookUrl.default(ALERT_SETTINGS_DEFAULT.webhookUrl),
+  telegramChatId: alertFields.telegramChatId.default(ALERT_SETTINGS_DEFAULT.telegramChatId)
+})
+/**
+ * Patch dari Operator. Sengaja TANPA nilai bawaan: di Zod 4, `.partial()` pada skema ber-default tetap mengisi
+ * default untuk kunci yang tidak dikirim, sehingga mengubah satu opsi akan menimpa opsi lainnya.
+ */
+export const AlertSettingsPatchSchema = z.object(alertFields).partial().strict()
+
+/** Kendali jarak jauh lewat browser di jaringan lokal. Password disimpan sebagai hash di vault, bukan di sini. */
+const remoteFields = {
+  enabled: z.boolean(),
+  port: z.number().int().min(1024).max(65535)
+}
+export const REMOTE_SETTINGS_DEFAULT = { enabled: false, port: 8787 }
+export const RemoteSettingsSchema = z.object({
+  enabled: remoteFields.enabled.default(REMOTE_SETTINGS_DEFAULT.enabled),
+  port: remoteFields.port.default(REMOTE_SETTINGS_DEFAULT.port)
+})
+/** Patch tanpa nilai bawaan (lihat AlertSettingsPatchSchema). */
+export const RemoteSettingsPatchSchema = z.object(remoteFields).partial().strict()
 
 /**
  * Entri jadwal preset berbasis jam.
@@ -217,5 +288,9 @@ export const SettingsSchema = z.object({
       hlsPort: z.number().int().min(1024).max(65535).default(8888),
       rtspPort: z.number().int().min(1024).max(65535).default(8554)
     })
-    .default({ enabled: true, apiPort: 9997, webrtcPort: 8889, hlsPort: 8888, rtspPort: 8554 })
+    .default({ enabled: true, apiPort: 9997, webrtcPort: 8889, hlsPort: 8888, rtspPort: 8554 }),
+  bannerTemplates: z.array(BannerTemplateSchema).max(50).default([]),
+  bannerSchedule: z.array(BannerScheduleEntrySchema).max(48).default([]),
+  alerts: AlertSettingsSchema.default(ALERT_SETTINGS_DEFAULT),
+  remote: RemoteSettingsSchema.default(REMOTE_SETTINGS_DEFAULT)
 })

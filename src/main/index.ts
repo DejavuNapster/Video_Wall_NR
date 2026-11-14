@@ -3,17 +3,21 @@ import { createDefaultPreset } from '@shared/layout'
 import { hasEnabledSchedule } from '@shared/schedule'
 import type { Result } from '@shared/types'
 import { mergeSettings, type PresetAction, type SettingsPatch } from '@shared/wallPayloads'
+import { tileSummary } from '@shared/tileSummary'
 import { ActivePresetService } from './activePreset'
+import { AlertMonitor } from './alerts'
 import { autostartStatus, repairAutostart, setAutostart } from './autostart'
 import { BackupService } from './backupService'
 import { BannerController } from './banner'
+import { BannerScheduler } from './bannerSchedule'
 import { dataPath, detectPlatform, flags } from './config'
 import { CredentialVault } from './credentials'
 import { DisplayManager } from './displays'
-import { registerHandlers } from './handlers'
+import { registerHandlers, VAULT_REMOTE_PASSWORD, VAULT_TELEGRAM_TOKEN } from './handlers'
 import { createLogger } from './logger'
 import { migrateLegacyUserData } from './migrate'
 import { createOperatorWindow, forceCloseOperator } from './operator'
+import { RemoteServer } from './remote/server'
 import { RotationController } from './rotation'
 import { ScheduleController } from './schedule'
 import { MediaMtxSidecar } from './sidecar'
@@ -80,6 +84,8 @@ async function bootstrap(): Promise<void> {
   let rotation: RotationController | null = null
   let schedule: ScheduleController | null = null
   let banner: BannerController | null = null
+  let remote: RemoteServer | null = null
+  let telegramTokenSet = await vault.has(VAULT_TELEGRAM_TOKEN)
 
   /**
    * Prioritas: jadwal berbasis jam lebih kuat daripada rotasi interval. Selama ada minimal satu entri
@@ -110,7 +116,9 @@ async function bootstrap(): Promise<void> {
     active: () => service?.current ?? null,
     saveError: () => service?.saveError ?? null,
     autostart: autostartStatus,
-    banner: () => banner?.get() ?? null
+    banner: () => banner?.get() ?? null,
+    remote: () => remote?.status() ?? { running: false, urls: [], passwordSet: false },
+    telegramTokenSet: () => telegramTokenSet
   })
   sidecar.on('state', () => hub?.notify())
   banner = new BannerController({
@@ -178,6 +186,8 @@ async function bootstrap(): Promise<void> {
     const cur = settings.get()
     const res = await settings.replace(mergeSettings(cur, patch))
     if (!res.ok) return res
+    if (patch.bannerSchedule || patch.bannerTemplates) bannerScheduler.restart()
+    if (patch.remote) await remoteServer.apply()
     if (patch.mediaMtxEnabled !== undefined && patch.mediaMtxEnabled !== cur.mediaMtx.enabled) {
       void sidecar
         .stop()
@@ -191,6 +201,39 @@ async function bootstrap(): Promise<void> {
     hub?.notify()
     return auto
   }
+
+  const bannerCtl = banner
+  const bannerScheduler = new BannerScheduler({
+    entries: () => settings.get().bannerSchedule,
+    templates: () => settings.get().bannerTemplates,
+    show: (b) => bannerCtl.set(b)
+  })
+  const alertMonitor = new AlertMonitor({
+    settings: () => settings.get().alerts,
+    statuses: () => wall.statusSnapshot(),
+    describe: (tileId) => {
+      for (const m of svc.current?.monitors ?? []) {
+        const tile = m.tiles.find((t) => t.id === tileId)
+        if (tile) return `"${tileSummary(tile)}" (monitor ${m.slot + 1})`
+      }
+      return `panel ${tileId}`
+    },
+    telegramToken: () => vault.get(VAULT_TELEGRAM_TOKEN)
+  })
+  remote = new RemoteServer({
+    settings: () => settings.get().remote,
+    passwordHash: () => vault.get(VAULT_REMOTE_PASSWORD),
+    state: () => hubRef.build(),
+    thumbnails: () => wall.captureThumbnails(),
+    activatePreset: (id) => svc.activate(id),
+    updateWall: (patch) => applySettings({ wall: patch }),
+    showBanner: (b) => bannerCtl.set(b),
+    clearBanner: () => bannerCtl.clear(),
+    reloadTile: (tileId) => wall.reloadTile(tileId),
+    onStatus: () => hub?.notify()
+  })
+  const remoteServer = remote
+  const hubRef = hub
 
   /** Beritahu jendela wall bila aksi shortcut gagal. */
   const report = (slot: number, res: Result): void => {
@@ -248,6 +291,14 @@ async function bootstrap(): Promise<void> {
       await refreshList()
       await wall.onSettingsChanged()
       rebalanceTimers()
+      bannerScheduler.restart()
+      await remoteServer.apply()
+    },
+    remote: remoteServer,
+    alerts: alertMonitor,
+    secretsChanged: async () => {
+      telegramTokenSet = await vault.has(VAULT_TELEGRAM_TOKEN)
+      hub?.notify()
     }
   })
   registerWallHandlers({
@@ -261,6 +312,9 @@ async function bootstrap(): Promise<void> {
 
   displays.start()
   wall.start()
+  alertMonitor.start()
+  bannerScheduler.restart()
+  void remoteServer.apply().catch((err) => log.error('kendali jarak jauh gagal mulai', err))
   // Saat startup, --hide-operator membuat Operator dibuat tersembunyi (kiosk); dibuka nanti lewat menu wall / Ctrl+Alt+O.
   // Satu monitor (Operator berbagi layar dengan wall): Operator hanya di taskbar supaya wall langsung terlihat.
   const sharesWallDisplay = displays.list().some((d) => d.primary && d.slot !== null)
@@ -302,11 +356,13 @@ async function bootstrap(): Promise<void> {
     rotation?.stop()
     schedule?.stop()
     banner?.stop()
+    alertMonitor.stop()
+    bannerScheduler.stop()
     // Simpan perubahan wall yang masih tertunda sebelum menutup.
     void svc
       .flush()
       .catch(() => undefined)
-      .then(() => Promise.allSettled([wall.shutdown(), sidecar.stop()]))
+      .then(() => Promise.allSettled([wall.shutdown(), sidecar.stop(), remoteServer.stop()]))
       .finally(() => {
         forceCloseOperator(operatorWin)
         app.quit()

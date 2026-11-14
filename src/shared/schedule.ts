@@ -33,8 +33,11 @@ export function minuteStamp(now: Date): string {
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}`
 }
 
+/** Bagian entri yang menentukan waktu (dipakai jadwal preset dan jadwal banner). */
+export type TimedEntry = Pick<ScheduleEntry, 'enabled' | 'hour' | 'minute' | 'weekdays'>
+
 /** true bila entri aktif dan jam+menit+hari sekarang cocok. */
-export function isEntryDue(e: ScheduleEntry, now: Date): boolean {
+export function isEntryDue(e: TimedEntry, now: Date): boolean {
   if (!e.enabled) return false
   if (e.hour !== now.getHours() || e.minute !== now.getMinutes()) return false
   const days: readonly number[] = e.weekdays ?? ALL_WEEKDAYS

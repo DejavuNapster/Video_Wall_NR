@@ -1,0 +1,299 @@
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { hostname, networkInterfaces } from 'node:os'
+import { z } from 'zod'
+import { BANNER_THEMES } from '@shared/bannerThemes'
+import { EmergencyBannerSchema } from '@shared/schema'
+import { tileSummary } from '@shared/tileSummary'
+import type { AppState, EmergencyBanner, RemoteStatus, Result, Thumbnails } from '@shared/types'
+import { createLogger } from '../logger'
+import { LoginLimiter, SessionStore, verifyPassword } from './auth'
+import clientCss from './client.css?raw'
+import clientHtml from './client.html?raw'
+import clientJs from './client.js?raw'
+
+const log = createLogger('remote')
+const COOKIE = 'vwnr_session'
+const MAX_BODY = 32 * 1024
+const id = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/)
+
+export interface RemoteDeps {
+  settings: () => { enabled: boolean; port: number }
+  /** Hash password dari vault (null = belum diatur; server tidak dijalankan). */
+  passwordHash: () => Promise<string | null>
+  state: () => AppState
+  thumbnails: () => Promise<Thumbnails>
+  activatePreset: (id: string) => Promise<Result>
+  updateWall: (patch: { displayMode?: boolean; rotation?: { enabled: boolean } }) => Promise<Result>
+  showBanner: (banner: EmergencyBanner) => void
+  clearBanner: () => void
+  reloadTile: (tileId: string) => boolean
+  /** Status server berubah (mulai / berhenti / gagal) → perbarui UI Operator. */
+  onStatus: () => void
+}
+
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message)
+  }
+}
+
+/** Server HTTP kecil di jaringan lokal: halaman kendali untuk ponsel/PC lain + API JSON. */
+export class RemoteServer {
+  private server: Server | null = null
+  private port = 0
+  private error: string | undefined
+  private passwordSet = false
+  private readonly sessions = new SessionStore()
+  private readonly limiter = new LoginLimiter()
+
+  constructor(private readonly d: RemoteDeps) {}
+
+  status(): RemoteStatus {
+    const running = this.server !== null
+    return {
+      running,
+      urls: running ? lanAddresses().map((ip) => `http://${ip}:${this.port}`) : [],
+      passwordSet: this.passwordSet,
+      ...(this.error ? { error: this.error } : {})
+    }
+  }
+
+  /** Sesuaikan server dengan pengaturan: nyalakan, matikan, atau pindah port. */
+  async apply(): Promise<void> {
+    const { enabled, port } = this.d.settings()
+    this.passwordSet = (await this.d.passwordHash()) !== null
+    const wanted = enabled && this.passwordSet
+    if (this.server && (!wanted || port !== this.port)) await this.stop()
+    this.error = enabled && !this.passwordSet ? 'Atur password terlebih dahulu' : undefined
+    if (wanted && !this.server) await this.start(port)
+    this.d.onStatus()
+  }
+
+  /** Password diganti: semua perangkat harus masuk ulang. */
+  async passwordChanged(): Promise<void> {
+    this.sessions.clear()
+    await this.apply()
+  }
+
+  async stop(): Promise<void> {
+    const server = this.server
+    this.server = null
+    this.sessions.clear()
+    if (!server) return
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    log.info('kendali jarak jauh berhenti')
+  }
+
+  private start(port: number): Promise<void> {
+    return new Promise((resolve) => {
+      const server = createServer((req, res) => {
+        void this.handle(req, res).catch((err: unknown) => {
+          const status = err instanceof HttpError ? err.status : 500
+          if (status === 500) log.error('permintaan gagal', err)
+          sendJson(res, status, { ok: false, error: err instanceof Error ? err.message : String(err) })
+        })
+      })
+      server.once('error', (err: NodeJS.ErrnoException) => {
+        this.error = err.code === 'EADDRINUSE' ? `Port ${port} sudah dipakai aplikasi lain` : err.message
+        log.warn(`kendali jarak jauh gagal mulai: ${this.error}`)
+        resolve()
+      })
+      server.listen(port, '0.0.0.0', () => {
+        server.on('error', (err) => log.warn(`kendali jarak jauh: ${err.message}`))
+        this.server = server
+        this.port = port
+        this.error = undefined
+        log.info(`kendali jarak jauh aktif di port ${port}`)
+        resolve()
+      })
+    })
+  }
+
+  private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const url = new URL(req.url ?? '/', 'http://localhost')
+    const route = `${req.method} ${url.pathname}`
+    const ip = req.socket.remoteAddress ?? '?'
+
+    switch (route) {
+      case 'GET /':
+        return sendText(res, 200, clientHtml, 'text/html; charset=utf-8')
+      case 'GET /remote.css':
+        return sendText(res, 200, clientCss, 'text/css; charset=utf-8')
+      case 'GET /remote.js':
+        return sendText(res, 200, clientJs, 'text/javascript; charset=utf-8')
+      case 'GET /api/session':
+        return sendJson(res, 200, { ok: true, authenticated: this.sessions.valid(sessionOf(req)) })
+    }
+
+    if (req.method === 'POST' && req.headers['x-vwnr'] !== '1') throw new HttpError(403, 'Permintaan ditolak')
+
+    if (route === 'POST /api/login') {
+      const locked = this.limiter.lockedFor(ip)
+      if (locked > 0) throw new HttpError(429, `Terlalu banyak percobaan. Coba lagi dalam ${Math.ceil(locked / 1000)} detik.`)
+      const { password } = parse(z.object({ password: z.string().max(256) }), await readBody(req))
+      const hash = await this.d.passwordHash()
+      if (!hash || !verifyPassword(hash, password)) {
+        this.limiter.fail(ip)
+        log.warn(`login kendali jarak jauh gagal dari ${ip}`)
+        throw new HttpError(401, 'Password salah')
+      }
+      this.limiter.succeed(ip)
+      const token = this.sessions.create()
+      res.setHeader('set-cookie', `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${this.sessions.ttlSeconds}`)
+      log.info(`login kendali jarak jauh dari ${ip}`)
+      return sendJson(res, 200, { ok: true })
+    }
+    if (route === 'POST /api/logout') {
+      this.sessions.revoke(sessionOf(req))
+      res.setHeader('set-cookie', `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`)
+      return sendJson(res, 200, { ok: true })
+    }
+
+    if (!this.sessions.valid(sessionOf(req))) throw new HttpError(401, 'Sesi berakhir, silakan masuk lagi')
+
+    switch (route) {
+      case 'GET /api/state':
+        return sendJson(res, 200, { ok: true, ...this.snapshot() })
+      case 'GET /api/thumbnails':
+        return sendJson(res, 200, { ok: true, thumbnails: await this.d.thumbnails() })
+      case 'POST /api/preset': {
+        const body = parse(z.object({ id }), await readBody(req))
+        return sendResult(res, await this.d.activatePreset(body.id))
+      }
+      case 'POST /api/display-mode': {
+        const body = parse(z.object({ on: z.boolean() }), await readBody(req))
+        return sendResult(res, await this.d.updateWall({ displayMode: body.on }))
+      }
+      case 'POST /api/rotation': {
+        const body = parse(z.object({ enabled: z.boolean() }), await readBody(req))
+        return sendResult(res, await this.d.updateWall({ rotation: { enabled: body.enabled } }))
+      }
+      case 'POST /api/banner': {
+        this.d.showBanner(parse(EmergencyBannerSchema, await readBody(req)))
+        return sendJson(res, 200, { ok: true })
+      }
+      case 'POST /api/banner/template': {
+        const body = parse(z.object({ id }), await readBody(req))
+        const template = this.d.state().settings.bannerTemplates.find((t) => t.id === body.id)
+        if (!template) throw new HttpError(404, 'Templat banner tidak ditemukan')
+        this.d.showBanner(template.banner)
+        return sendJson(res, 200, { ok: true })
+      }
+      case 'POST /api/banner/clear':
+        this.d.clearBanner()
+        return sendJson(res, 200, { ok: true })
+      case 'POST /api/tile/reload': {
+        const body = parse(z.object({ id }), await readBody(req))
+        return sendResult(res, this.d.reloadTile(body.id) ? { ok: true } : { ok: false, error: 'Panel tidak sedang tampil di wall' })
+      }
+    }
+    throw new HttpError(404, 'Tidak ditemukan')
+  }
+
+  /** Ringkasan state untuk halaman kendali (tanpa pengaturan internal). */
+  private snapshot(): object {
+    const s = this.d.state()
+    const wallSlots = new Set(s.displays.filter((d) => d.slot !== null).map((d) => d.slot))
+    return {
+      app: 'Video Wall NR',
+      version: s.version,
+      host: hostname(),
+      presets: s.presets.map((p) => ({ id: p.id, name: p.name })),
+      activePresetId: s.activePresetId,
+      displayMode: s.settings.wall.displayMode,
+      rotation: s.settings.wall.rotation.enabled,
+      scheduleActive: s.settings.wall.schedule.some((e) => e.enabled),
+      banner: s.banner
+        ? { title: s.banner.banner.title, text: s.banner.banner.text, pinned: s.banner.banner.pinned, setAt: s.banner.setAt, durationSec: s.banner.banner.durationSec }
+        : null,
+      templates: s.settings.bannerTemplates.map((t) => ({ id: t.id, name: t.name })),
+      themes: BANNER_THEMES,
+      monitors: (s.activePreset?.monitors ?? [])
+        .filter((m) => wallSlots.has(m.slot))
+        .map((m) => ({
+          slot: m.slot,
+          tiles: m.tiles.map((t) => {
+            const st = s.tileStatus[t.id]
+            return {
+              id: t.id,
+              summary: tileSummary(t),
+              type: t.source.type,
+              state: st?.state ?? null,
+              error: st && st.state !== 'ok' ? st.lastError : undefined
+            }
+          })
+        }))
+    }
+  }
+}
+
+/** Alamat IPv4 jaringan lokal komputer ini. */
+function lanAddresses(): string[] {
+  const out: string[] = []
+  for (const list of Object.values(networkInterfaces())) {
+    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal) out.push(a.address)
+  }
+  return out
+}
+
+function sessionOf(req: IncomingMessage): string | undefined {
+  for (const part of (req.headers.cookie ?? '').split(';')) {
+    const [k, v] = part.trim().split('=')
+    if (k === COOKIE && v) return v
+  }
+  return undefined
+}
+
+function readBody(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let size = 0
+    const chunks: Buffer[] = []
+    req.on('data', (c: Buffer) => {
+      size += c.length
+      if (size > MAX_BODY) {
+        reject(new HttpError(413, 'Permintaan terlalu besar'))
+        req.destroy()
+      } else chunks.push(c)
+    })
+    req.on('end', () => {
+      try {
+        resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {})
+      } catch {
+        reject(new HttpError(400, 'Format permintaan tidak valid'))
+      }
+    })
+    req.on('error', reject)
+  })
+}
+
+function parse<T>(schema: z.ZodType<T>, raw: unknown): T {
+  const r = schema.safeParse(raw)
+  if (!r.success) throw new HttpError(400, `Permintaan tidak valid: ${r.error.issues[0]?.message ?? 'format salah'}`)
+  return r.data
+}
+
+const SECURITY_HEADERS = {
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+  'cache-control': 'no-store',
+  'content-security-policy':
+    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+}
+
+function sendText(res: ServerResponse, status: number, body: string, type: string): void {
+  res.writeHead(status, { ...SECURITY_HEADERS, 'content-type': type })
+  res.end(body)
+}
+
+function sendJson(res: ServerResponse, status: number, body: object): void {
+  if (res.headersSent) return
+  sendText(res, status, JSON.stringify(body), 'application/json; charset=utf-8')
+}
+
+function sendResult(res: ServerResponse, r: Result): void {
+  sendJson(res, r.ok ? 200 : 400, r)
+}

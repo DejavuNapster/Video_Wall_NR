@@ -1,6 +1,7 @@
 import { type Event, type Input, WebContentsView } from 'electron'
 import { BackoffTracker } from '@shared/backoff'
 import { effectiveIgnoreCert } from '@shared/tileKey'
+import { cyclePages } from '@shared/webPanel'
 import type { Rect, Settings, Tile, TileState, TileStatus, VideoHeartbeat, VideoTileConfig } from '@shared/types'
 import { preloadPath, rendererTarget } from './config'
 import { createLogger } from './logger'
@@ -50,6 +51,11 @@ export class TileView {
   private lastProgressAt = Date.now()
   private lastMemoryReloadAt = 0
   private destroyed = false
+  /** Rotasi halaman panel web: indeks halaman saat ini di cyclePages() dan timernya. */
+  private cycleIndex = 0
+  private cycleTimer: NodeJS.Timeout | null = null
+  /** Kunci CSS tambahan yang sedang tersuntik di dokumen saat ini (untuk diganti tanpa reload). */
+  private cssKey: string | null = null
   /** Halaman sedang fullscreen HTML (tombol "Layar Penuh" di dalam web); Esc milik halaman. */
   htmlFullscreen = false
   /** `tileHardKey` saat tile dibuat; bila berubah, WallController membuat tile baru. */
@@ -105,7 +111,7 @@ export class TileView {
   }
 
   /**
-   * Terapkan perubahan yang tidak butuh memuat ulang halaman (zoom, refresh otomatis, label).
+   * Terapkan perubahan yang tidak butuh membuat ulang panel (zoom, refresh otomatis, CSS, rotasi halaman, label).
    * Perubahan lain (URL, jenis, sertifikat) membuat WallController membuat TileView baru.
    */
   update(tile: Tile): void {
@@ -120,6 +126,13 @@ export class TileView {
       this.reloadTimer = null
       this.armScheduledReload()
     }
+    if ((src.css ?? '') !== (prev.css ?? '')) void this.applyCss()
+    if (JSON.stringify(src.cycle) !== JSON.stringify(prev.cycle)) {
+      // Daftar halaman berubah: mulai lagi dari halaman utama.
+      this.cycleIndex = 0
+      this.armCycle()
+      void this.load()
+    }
   }
 
   focus(): void {
@@ -130,7 +143,22 @@ export class TileView {
   start(): void {
     this.healthTimer = setInterval(() => this.checkHealth(), HEALTH_INTERVAL_MS)
     this.armScheduledReload()
+    this.armCycle()
     void this.load()
+  }
+
+  /** Kembali ke halaman utama panel (URL panel, halaman pertama rotasi). */
+  goHome(): void {
+    this.cycleIndex = 0
+    this.armCycle()
+    this.reload('kembali ke URL panel')
+  }
+
+  /** Halaman rotasi yang sedang tampil (1-based) dan jumlahnya; null bila panel tidak berotasi. */
+  get cyclePosition(): { index: number; total: number } | null {
+    const src = this.tile.source
+    if (src.type !== 'web' || !src.cycle) return null
+    return { index: this.cycleIndex + 1, total: cyclePages(src).length }
   }
 
   /** Halaman yang sedang terbuka (panel web), untuk "buka di panel baru". */
@@ -205,6 +233,7 @@ export class TileView {
     if (this.destroyed) return
     this.destroyed = true
     for (const t of [this.recoveryTimer, this.unresponsiveTimer, this.reloadTimer]) if (t) clearTimeout(t)
+    if (this.cycleTimer) clearInterval(this.cycleTimer)
     if (this.healthTimer) clearInterval(this.healthTimer)
     tileByWebContents.delete(this.webContentsId)
     const wc = this.view.webContents
@@ -242,6 +271,11 @@ export class TileView {
     })
     // Halaman berpindah (klik link, kembali/maju, SPA): kirim URL + status riwayat ke UI wall.
     wc.on('did-navigate', () => this.syncNav())
+    // Dokumen baru: CSS tambahan perlu disuntik ulang (sisipan lama ikut hilang bersama dokumennya).
+    wc.on('dom-ready', () => {
+      this.cssKey = null
+      void this.applyCss()
+    })
     wc.on('did-navigate-in-page', (_event, _url, isMainFrame) => {
       if (isMainFrame) this.syncNav()
     })
@@ -298,7 +332,8 @@ export class TileView {
     try {
       const src = this.tile.source
       if (src.type === 'web') {
-        await wc.loadURL(src.url)
+        const pages = cyclePages(src)
+        await wc.loadURL(pages[this.cycleIndex % pages.length] ?? src.url)
       } else if (src.type !== 'empty') {
         const config = await this.ctx.resolveVideo(this.tile)
         if (!config) throw new Error('Sumber video belum tersedia (MediaMTX belum siap atau dimatikan)')
@@ -354,6 +389,41 @@ export class TileView {
       },
       minutes * 60_000 * jitter
     )
+  }
+
+  /** Ganti CSS tambahan di dokumen saat ini tanpa memuat ulang halaman. */
+  private async applyCss(): Promise<void> {
+    const wc = this.view.webContents
+    if (this.destroyed || wc.isDestroyed()) return
+    const src = this.tile.source
+    const css = src.type === 'web' ? (src.css ?? '').trim() : ''
+    const old = this.cssKey
+    this.cssKey = null
+    if (old) await wc.removeInsertedCSS(old).catch(() => undefined)
+    if (!css || this.destroyed || wc.isDestroyed()) return
+    try {
+      this.cssKey = await wc.insertCSS(css)
+    } catch (err) {
+      log.warn(`CSS panel ${this.tile.id} gagal disuntikkan: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  /** (Re)start timer rotasi halaman. Halaman berikutnya dimuat lewat load() supaya pemulihan tetap berlaku. */
+  private armCycle(): void {
+    if (this.cycleTimer) clearInterval(this.cycleTimer)
+    this.cycleTimer = null
+    const src = this.tile.source
+    if (this.destroyed || src.type !== 'web' || !src.cycle) {
+      this.cycleIndex = 0
+      return
+    }
+    const total = cyclePages(src).length
+    this.cycleIndex %= total
+    this.cycleTimer = setInterval(() => {
+      if (this.destroyed || this.recoveryTimer) return // sedang pemulihan: jangan menimpa jadwal coba ulang
+      this.cycleIndex = (this.cycleIndex + 1) % total
+      void this.load()
+    }, src.cycle.intervalSec * 1000)
   }
 
   private syncNav(): void {

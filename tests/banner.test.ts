@@ -32,6 +32,7 @@ const banner = (over: Partial<EmergencyBanner> = {}): EmergencyBanner => ({
   durationSec: 0,
   pinned: false,
   mode: 'cover',
+  sound: false,
   ...over
 })
 
@@ -124,7 +125,8 @@ describe('skema banner darurat', () => {
       fontSize: 96,
       durationSec: 300,
       pinned: false,
-      mode: 'cover'
+      mode: 'cover',
+      sound: false
     })
   })
 

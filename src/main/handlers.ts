@@ -3,10 +3,11 @@ import { dialog, ipcMain, type BrowserWindow, type IpcMainEvent, type IpcMainInv
 import { parseBackupPayload } from '@shared/backup'
 import { IPC } from '@shared/ipc'
 import { EmergencyBannerSchema } from '@shared/schema'
-import type { Result } from '@shared/types'
+import type { Result, Thumbnails } from '@shared/types'
 import { WallEditSchema } from '@shared/wallEdits'
 import { PresetActionSchema, type PresetAction, type SettingsPatch, SettingsPatchSchema } from '@shared/wallPayloads'
 import type { ActivePresetService } from './activePreset'
+import type { AlertMonitor } from './alerts'
 import type { BackupService } from './backupService'
 import type { BannerController } from './banner'
 import type { CredentialVault } from './credentials'
@@ -14,6 +15,8 @@ import type { DisplayManager } from './displays'
 import { identifyDisplays } from './identify'
 import { createLogger } from './logger'
 import type { StateHub } from './state'
+import { MIN_PASSWORD_LENGTH, hashPassword } from './remote/auth'
+import type { RemoteServer } from './remote/server'
 import { isSafeId } from './store'
 import { tileByWebContents } from './tiles'
 import type { WallController } from './wall'
@@ -36,7 +39,15 @@ export interface HandlerDeps {
   applySettings: (patch: SettingsPatch) => Promise<Result>
   /** Setelah restore backup: muat ulang daftar preset + preset aktif dari disk. */
   afterRestore: () => Promise<void>
+  remote: RemoteServer
+  alerts: AlertMonitor
+  /** Rahasia tersimpan berubah (status "sudah diisi" di UI perlu diperbarui). */
+  secretsChanged: () => Promise<void>
 }
+
+/** Kunci rahasia aplikasi di CredentialVault (berdampingan dengan password RTSP per panel). */
+export const VAULT_REMOTE_PASSWORD = 'remote-password'
+export const VAULT_TELEGRAM_TOKEN = 'alert-telegram-token'
 
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error })
 
@@ -158,6 +169,31 @@ export function registerHandlers(d: HandlerDeps): void {
     d.banner.clear()
     return { ok: true }
   })
+
+  // ------------------------------------------------------------- pratinjau, kendali jarak jauh, peringatan
+  handle(IPC.thumbnails, (): Promise<Thumbnails> => d.wall.captureThumbnails())
+
+  handle(IPC.setRemotePassword, async (password): Promise<Result> => {
+    if (typeof password !== 'string' || password.length > 256) return fail('Password tidak valid')
+    if (password === '') await d.vault.remove(VAULT_REMOTE_PASSWORD)
+    else if (password.length < MIN_PASSWORD_LENGTH) return fail(`Password minimal ${MIN_PASSWORD_LENGTH} karakter`)
+    else await d.vault.set(VAULT_REMOTE_PASSWORD, hashPassword(password))
+    await d.secretsChanged()
+    await d.remote.passwordChanged()
+    return { ok: true }
+  })
+
+  handle(IPC.setTelegramToken, async (token): Promise<Result> => {
+    if (typeof token !== 'string' || token.length > 256) return fail('Token tidak valid')
+    const t = token.trim()
+    if (t !== '' && !/^\d{5,20}:[A-Za-z0-9_-]{20,}$/.test(t)) return fail('Format token bot Telegram tidak dikenali (contoh: 123456789:AAH...)')
+    if (t === '') await d.vault.remove(VAULT_TELEGRAM_TOKEN)
+    else await d.vault.set(VAULT_TELEGRAM_TOKEN, t)
+    await d.secretsChanged()
+    return { ok: true }
+  })
+
+  handle(IPC.testAlert, (): Promise<Result> => d.alerts.test())
 
   // ------------------------------------------------------------- halaman video
   ipcMain.handle(IPC.videoGetConfig, (event) => {
