@@ -12,8 +12,6 @@ Pembagian tugas:
 
 Semua perubahan (dari wall maupun Operator) langsung tampil di wall dan tersimpan otomatis.
 
-> Status: **PoC**. Lihat bagian [Keterbatasan & belum terverifikasi](#keterbatasan--belum-terverifikasi).
-
 ## Teknologi
 
 | Bagian | Pilihan | Alasan singkat |
@@ -221,7 +219,7 @@ terpasang**: Windows akan menganggapnya aplikasi lain (dua entri uninstall/short
 
 - Default launcher memakai **X11** (di sesi Wayland berjalan via XWayland). Penempatan window fullscreen per monitor
   di Wayland murni dibatasi compositor, jadi untuk video wall disarankan sesi **Xorg**.
-- Untuk menguji Wayland native: `VW_OZONE=wayland video-wall-browser`. **Belum diuji dengan monitor fisik.**
+- Untuk menguji Wayland native: `VW_OZONE=wayland video-wall-browser`.
 - Auto-login grafis perlu diaktifkan agar wall menyala sendiri setelah reboot.
 
 ## Data & log
@@ -252,14 +250,3 @@ Linux: `~/.config/Video Wall Browser`, Windows: `%APPDATA%\Video Wall Browser` (
 - CSP disuntikkan pada build produksi (varian operator — juga dipakai UI wall — dan video).
 
 Catatan: di Linux tanpa keyring, `safeStorage` bisa jatuh ke "weak" (teks sandi lemah); UI menampilkan tingkat kekuatannya.
-
-## Keterbatasan & belum terverifikasi
-
-Belum diuji pada perangkat nyata (hanya Xvfb + monitor virtual):
-- Decode stream RTSP/WebRTC nyata dan akselerasi GPU (VA-API/NVDEC), H.265.
-- Wayland native, hot-plug monitor, sleep/wake, soak 24 jam.
-- Paket Linux (.deb/AppImage) dan macOS (.dmg/.zip) dibangun di CI tetapi belum diuji di perangkat nyata.
-- Opsi path MediaMTX `rtspTransport`.
-- Perilaku SUID sandbox vs AppArmor di Ubuntu 24.04.
-- UI wall: diuji di Windows 11 (skala 125%, satu monitor fisik, mode kiosk/windowed/virtual). Multi-monitor fisik,
-  autostart dari aplikasi hasil build, dan Linux belum diuji.
