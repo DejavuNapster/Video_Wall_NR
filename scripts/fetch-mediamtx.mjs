@@ -11,7 +11,7 @@
  *   npm run fetch:mediamtx -- --force            # unduh ulang
  *
  * CATATAN darwin: binary darwin bernama `mediamtx` (SAMA dengan Linux), sehingga
- * untuk platform darwin hasil ditulis ke resources/bin-darwin/ — direktori TERPISAH
+ * untuk platform darwin hasil ditulis ke resources/bin-darwin-<arch>/ (x64 / arm64) — direktori TERPISAH
  * agar TIDAK menimpa binary Linux di resources/bin/ (yang dipakai rilis Linux).
  */
 import { execFileSync } from 'node:child_process'
@@ -37,7 +37,8 @@ const ASSETS = {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 // darwin: direktori TERPISAH (bin-darwin) — nama file-nya sama dengan binary Linux,
 // menulis ke resources/bin/ akan MENIMPA binary Linux milik rilis Linux.
-const destDir = platform === 'darwin' ? join(root, 'resources', 'bin-darwin') : join(root, 'resources', 'bin')
+// Per arsitektur supaya build macOS Intel + Apple Silicon sekaligus (electron-builder: from: bin-darwin-${arch}).
+const destDir = platform === 'darwin' ? join(root, 'resources', `bin-darwin-${arch}`) : join(root, 'resources', 'bin')
 const asset = ASSETS[`${platform}-${arch}`]
 if (!asset) {
   console.error(`Kombinasi ${platform}/${arch} belum didukung skrip ini. Unduh manual dari https://github.com/bluenviron/mediamtx/releases`)

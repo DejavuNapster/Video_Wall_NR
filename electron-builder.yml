@@ -23,7 +23,10 @@ files:
 asarUnpack:
   - resources/bin/**
 
-# ---- Toolsets (cross-build Windows dari Linux) ----
+# macOS: tanda tangan ad-hoc sebelum dmg/zip dibuat (lihat build/afterPack.cjs).
+afterPack: build/afterPack.cjs
+
+# ---- Toolsets (hanya dipakai bila build Windows dari host Linux) ----
 # electron-builder 26.x: wine "0.0.0" (default) = pakai wine SISTEM (butuh
 # install wine + arsitektur i386). Kita pakai bundle wine 11 self-contained
 # (ia32 via WoW64) yang diunduh dari GitHub electron-builder-binaries, agar
@@ -65,38 +68,31 @@ nsis:
 portable:
   artifactName: ${name}-${version}-${arch}-portable.${ext}
 
-# ---- macOS (dmg + zip, unsigned) ----
-# macOS — best-effort cross-build dari host Linux (task t_62594db2, v0.2.2):
-#   - target dmg + zip; zip = fallback aman bila pembuatan dmg bermasalah di host Linux.
-#   - identity: null → PENANDA-TANGANAN DILEWATI (host Linux, tanpa sertifikat Apple/Developer ID).
-#     Catatan runtime: macOS Gatekeeper meminta right-click → Open (dua klik) untuk app unsigned.
-#   - extraResources WAJIB dari resources/bin-darwin/ (binary DARWIN, Mach-O) — BUKAN
-#     resources/bin/ (binary Linux, ELF). Nama file-nya sama (mediamtx) sehingga sumbernya
-#     harus direktori terpisah; runtime mencari bin/mediamtx di
-#     Contents/Resources/bin/mediamtx (src/main/sidecar.ts binaryPath()).
-#   - icon: build/icon.png (512x512) — electron-builder mengonversi ke .icns otomatis.
-#   - dmg.backgroundColor (di blok `dmg:` LEVEL AKAR, bukan di bawah mac — schema v26
-#     menolak properti `dmg` di dalam `mac`) memakai background WARNA agar dmg-builder
-#     TIDAK membaca background.tiff via `sips` (tool macOS, tidak ada di host Linux).
+# ---- macOS (dmg + zip, Intel x64 + Apple Silicon arm64) ----
+# Dibangun di runner macOS GitHub Actions (.github/workflows/release.yml).
+#   - identity: null → tanpa sertifikat Apple Developer ID; build/afterPack.cjs memberi tanda tangan
+#     ad-hoc agar app bisa dijalankan di Apple Silicon. Gatekeeper tetap memperingatkan app unsigned:
+#     buka lewat klik-kanan → Open, atau `xattr -cr "/Applications/Video Wall Browser.app"`.
+#   - MediaMTX darwin per arsitektur di resources/bin-darwin-<arch>/ (npm run fetch:mediamtx dengan
+#     MEDIAMTX_PLATFORM=darwin MEDIAMTX_ARCH=x64|arm64); ${arch} diganti electron-builder saat packaging.
+#   - icon: build/icon.png (512x512) — dikonversi ke .icns otomatis.
 mac:
   category: public.app-category.video
   identity: null
+  hardenedRuntime: false
   icon: build/icon.png
-  artifactName: ${name}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-mac-${arch}.${ext}
   extraResources:
-    - from: resources/bin-darwin
+    - from: resources/bin-darwin-${arch}
       to: bin
       filter:
         - mediamtx
   target:
     - target: dmg
-      arch:
-        - x64
+      arch: [x64, arm64]
     - target: zip
-      arch:
-        - x64
+      arch: [x64, arm64]
 
-# ---- Opsi DMG (level akar) ----
 dmg:
   backgroundColor: "#f5f5f7"
 
@@ -113,11 +109,9 @@ linux:
       filter:
         - "mediamtx"
   target:
-    - target: AppImage
-      arch: [x64]
     - target: deb
       arch: [x64]
-    - target: rpm
+    - target: AppImage
       arch: [x64]
 
 # AppImage: SUID sandbox Chromium (dibutuhkan agar VA-API/GPU decode jalan di kiosk)

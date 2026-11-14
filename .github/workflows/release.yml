@@ -1,0 +1,91 @@
+# Build installer Windows, Linux (.deb + AppImage), dan macOS (.dmg + .zip, Intel + Apple Silicon)
+# di runner asli masing-masing OS, lalu terbitkan ke halaman Releases saat tag v* di-push.
+#   git tag v0.2.4 && git push origin v0.2.4
+# Jalankan manual (Actions → Release → Run workflow) untuk build tanpa membuat rilis.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: --win
+          - name: Linux
+            os: ubuntu-latest
+            target: --linux
+          - name: macOS
+            os: macos-latest
+            target: --mac
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - name: Unduh MediaMTX
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            MEDIAMTX_PLATFORM=darwin MEDIAMTX_ARCH=x64 node scripts/fetch-mediamtx.mjs
+            MEDIAMTX_PLATFORM=darwin MEDIAMTX_ARCH=arm64 node scripts/fetch-mediamtx.mjs
+          else
+            node scripts/fetch-mediamtx.mjs
+          fi
+
+      - run: npm run build
+
+      - name: Paket installer
+        run: npx electron-builder ${{ matrix.target }} --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.dmg
+            dist/*.zip
+
+  release:
+    name: Terbitkan rilis
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksum SHA-256
+        working-directory: artifacts
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Video Wall Browser ${{ github.ref_name }}
+          body_path: .github/release-notes.md
+          files: artifacts/*

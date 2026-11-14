@@ -2,7 +2,7 @@
   "name": "video-wall-browser",
   "productName": "Video Wall Browser",
   "version": "0.2.4",
-  "description": "Video Wall Browser - video wall multi-monitor (web + video) untuk Windows dan Linux",
+  "description": "Video Wall Browser - video wall multi-monitor (web + video) untuk Windows, Linux, dan macOS",
   "main": "./out/main/index.js",
   "author": {
     "name": "Video Wall Browser",
@@ -50,6 +50,6 @@
     "vitest": "^5.0.4",
     "zustand": "^5.0.15"
   },
-  "homepage": "https://example.com/video-wall-browser",
+  "homepage": "https://github.com/DejavuNapster/Video_Wall_NR",
   "desktopName": "video-wall-browser.desktop"
 }

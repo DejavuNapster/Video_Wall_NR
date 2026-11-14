@@ -9,7 +9,7 @@ dist-*/
 
 # Binary sidecar MediaMTX — unduh ulang dengan `npm run fetch:mediamtx`
 resources/bin/*
-resources/bin-darwin/
+resources/bin-darwin*/
 !resources/bin/.mediamtx-version
 
 # Environment & rahasia

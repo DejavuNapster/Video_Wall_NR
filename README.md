@@ -1,6 +1,7 @@
 # Video Wall Browser (PoC)
 
-Aplikasi desktop video wall multi-monitor untuk **Windows (.exe)** dan **Linux (installer .sh)**.
+Aplikasi desktop video wall multi-monitor untuk **Windows** (.exe), **Linux** (.deb / AppImage), dan **macOS** (.dmg, Intel + Apple Silicon).
+Unduh installer dari halaman [Releases](../../releases).
 Setiap panel dapat menampilkan **halaman web**, **stream video** (RTSP/HLS/WHEP/MJPEG), **jam**, atau **teks berjalan**.
 Pembagian tugas:
 
@@ -22,7 +23,7 @@ Semua perubahan (dari wall maupun Operator) langsung tampil di wall dan tersimpa
 | UI operator | React 19, Tailwind CSS 4, zustand, react-grid-layout 2 | Drag & resize tile secara interaktif |
 | Validasi | zod 4 | Skema preset/pengaturan yang sama di main dan renderer |
 | Video RTSP | MediaMTX 1.21.2 (sidecar) → WebRTC (WHEP), fallback HLS | Browser tidak bisa memutar RTSP langsung |
-| Paket | electron-builder 26 | NSIS + portable (Windows), AppImage/deb/rpm (Linux) |
+| Paket | electron-builder 26 | NSIS + portable (Windows), deb + AppImage (Linux), dmg + zip (macOS) |
 | Test | vitest 5 | Unit test logika murni di `tests/` (skema, edit panel, geometri, layout, jadwal/rotasi, banner, backup, store Operator, keamanan) |
 
 ## Arsitektur
@@ -177,40 +178,44 @@ dan terkurung di kotak panelnya (Esc untuk keluar).
 
 ## Build paket
 
+Lokal (di OS targetnya masing-masing):
+
 ```bash
 npm run fetch:mediamtx
-npm run dist:linux     # AppImage + deb + rpm  (rpm butuh `rpmbuild`)
-npm run dist:win       # NSIS + portable .exe  (jalankan di Windows / CI)
+npm run dist:win       # Windows: NSIS + portable .exe
+npm run dist:linux     # Linux: .deb + AppImage
+# macOS: MediaMTX per arsitektur, lalu dmg + zip untuk x64 dan arm64
+MEDIAMTX_PLATFORM=darwin MEDIAMTX_ARCH=x64 npm run fetch:mediamtx
+MEDIAMTX_PLATFORM=darwin MEDIAMTX_ARCH=arm64 npm run fetch:mediamtx
+npm run dist:mac
 ```
 
-Ikon Windows memakai `build/icon.ico` yang sudah jadi. Bila `build/icon.png` diganti, buat ulang dengan
-`.\scripts\windows\make-icon.ps1` (konversi ikon bawaan electron-builder bisa gagal
-"WebAssembly.Memory(): could not allocate memory" di mesin dengan memori terbatas).
-`.exe` belum ditandatangani digital, sehingga Windows SmartScreen akan menampilkan peringatan saat pertama dijalankan.
-
-CI GitHub Actions (`.github/workflows/build.yml`) membangun Windows (`windows-latest`) dan Linux (`ubuntu-22.04`)
-dan mengunggah artefak. Build Windows sudah diuji secara lokal (Windows 11); CI belum pernah dijalankan.
-
-`appId` = `itsupport.videowallbrowser` (di `electron-builder.yml`). **Jangan diubah setelah aplikasi
-terpasang**: Windows akan menganggapnya aplikasi lain (dua entri uninstall/shortcut). Placeholder yang tersisa:
-`homepage` di `package.json` (dipakai paket Linux).
-
-## Instalasi Linux (Ubuntu 22.04 LTS atau lebih baru)
+**Rilis otomatis** — `.github/workflows/release.yml` membangun ketiga OS di runner GitHub Actions
+(`windows-latest`, `ubuntu-latest`, `macos-latest`), lalu menerbitkan semua installer + `SHA256SUMS.txt` ke
+halaman Releases. Catatan rilis diambil dari `.github/release-notes.md`.
 
 ```bash
-sudo ./scripts/linux/install.sh --appimage ./dist/video-wall-browser-0.2.1-x86_64.AppImage \
-     --autostart --user wall
-# opsional: nonaktifkan Wayland di GDM (backup dibuat), lalu reboot
-sudo ./scripts/linux/install.sh --appimage ... --user wall --force-xorg
-# hapus
-sudo ./scripts/linux/install.sh --uninstall --user wall [--purge]
+# naikkan "version" di package.json, commit, lalu:
+git tag v0.2.4
+git push origin main v0.2.4
 ```
 
-Yang dilakukan installer: ekstrak AppImage tanpa FUSE ke `/opt/video-wall-browser`, `chrome-sandbox` SUID 4755,
-launcher `/usr/local/bin/video-wall-browser` (memaksa `--ozone-platform=x11`), entri menu, dan (opsional) service
-systemd **user** dengan `Restart=always`.
+Ikon Windows memakai `build/icon.ico` yang sudah jadi; Linux/macOS memakai `build/icon.png` (512×512).
+Installer belum ditandatangani: Windows SmartScreen memperingatkan saat pertama dijalankan, dan macOS hanya diberi
+tanda tangan ad-hoc (`build/afterPack.cjs`) sehingga Gatekeeper perlu dibuka sekali
+(`xattr -cr "/Applications/Video Wall Browser.app"` atau klik-kanan → Open).
 
-Alternatif: `sudo apt install ./video-wall-browser-0.2.1-amd64.deb`.
+`appId` = `itsupport.videowallbrowser` (di `electron-builder.yml`). **Jangan diubah setelah aplikasi
+terpasang**: Windows akan menganggapnya aplikasi lain (dua entri uninstall/shortcut).
+
+## Instalasi
+
+- **Windows**: jalankan installer (`-x64.exe`) atau versi portable (`-x64-portable.exe`). Aktifkan
+  **Jalan otomatis saat login** di Operator › Pengaturan, dan auto-login Windows (`netplwiz`) untuk akun wall.
+- **Ubuntu / Debian**: `sudo apt install ./video-wall-browser-<versi>-amd64.deb`
+- **Linux lain**: `chmod +x video-wall-browser-<versi>-x86_64.AppImage` lalu jalankan.
+- **macOS**: buka `.dmg` (`mac-arm64` untuk Apple Silicon, `mac-x64` untuk Intel), seret ke *Applications*, lalu
+  `xattr -cr "/Applications/Video Wall Browser.app"` sekali sebelum dibuka.
 
 ### X11 vs Wayland
 
@@ -218,18 +223,6 @@ Alternatif: `sudo apt install ./video-wall-browser-0.2.1-amd64.deb`.
   di Wayland murni dibatasi compositor, jadi untuk video wall disarankan sesi **Xorg**.
 - Untuk menguji Wayland native: `VW_OZONE=wayland video-wall-browser`. **Belum diuji dengan monitor fisik.**
 - Auto-login grafis perlu diaktifkan agar wall menyala sendiri setelah reboot.
-
-## Instalasi Windows
-
-Jalankan installer NSIS atau `.exe` portable. Autostart + pemulihan otomatis:
-
-```powershell
-# PowerShell sebagai Administrator
-.\scripts\windows\install-autostart.ps1
-.\scripts\windows\install-autostart.ps1 -Remove
-```
-
-Aktifkan auto-login Windows (`netplwiz`) untuk akun wall.
 
 ## Data & log
 
@@ -265,12 +258,8 @@ Catatan: di Linux tanpa keyring, `safeStorage` bisa jatuh ke "weak" (teks sandi 
 Belum diuji pada perangkat nyata (hanya Xvfb + monitor virtual):
 - Decode stream RTSP/WebRTC nyata dan akselerasi GPU (VA-API/NVDEC), H.265.
 - Wayland native, hot-plug monitor, sleep/wake, soak 24 jam.
-- Build/run Windows, build `.rpm`, autostart systemd pada sesi nyata.
+- Paket Linux (.deb/AppImage) dan macOS (.dmg/.zip) dibangun di CI tetapi belum diuji di perangkat nyata.
 - Opsi path MediaMTX `rtspTransport`.
 - Perilaku SUID sandbox vs AppArmor di Ubuntu 24.04.
 - UI wall: diuji di Windows 11 (skala 125%, satu monitor fisik, mode kiosk/windowed/virtual). Multi-monitor fisik,
   autostart dari aplikasi hasil build, dan Linux belum diuji.
-
-Catatan: skrip instalasi (`scripts/linux/install.sh`, `scripts/windows/*.ps1`), ikon `build/`, dan workflow CI
-yang disebut di atas tidak ikut dalam source hasil rekonstruksi ini; `npm run dev` / `npm run build` tidak
-membutuhkannya, tetapi paket installer (`dist:*`) membutuhkan ikon di `build/`.
