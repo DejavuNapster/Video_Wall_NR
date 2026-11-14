@@ -1,0 +1,131 @@
+# Rekonstruksi dari README + source (file asli hilang di region korup ZIP).
+# Sumber fakta: README.md, package.json, src/main/sidecar.ts (binaryPath -> resourcePath('bin', 'mediamtx(.exe)')).
+appId: itsupport.videowallbrowser
+productName: Video Wall Browser
+copyright: Copyright © 2026 Video Wall Browser
+# electron, electron-builder versi diambil otomatis dari package.json.
+
+directories:
+  buildResources: build
+  output: dist
+
+# Hanya hasil build electron-vite (out/) yang masuk asar.
+# Source, tests, .git, dll TIDAK ikut (biar paket bersih).
+files:
+  - out/**
+  - package.json
+
+# Sidecar MediaMTX (RTSP -> WebRTC/HLS) di-bundle ke <resources>/bin/,
+# sehingga resourcePath('bin','mediamtx'/'mediamtx.exe') di main menemukan binary.
+# Dipisah per-platform (di blok win/ linux/ di bawah) agar TIAP installer hanya
+# memuat binary OS targetnya, BUKAN semua isi resources/bin.
+
+asarUnpack:
+  - resources/bin/**
+
+# ---- Toolsets (cross-build Windows dari Linux) ----
+# electron-builder 26.x: wine "0.0.0" (default) = pakai wine SISTEM (butuh
+# install wine + arsitektur i386). Kita pakai bundle wine 11 self-contained
+# (ia32 via WoW64) yang diunduh dari GitHub electron-builder-binaries, agar
+# build NSIS di container headless tanpa install wine sistem manual.
+# Rujukan: https://github.com/electron-userland/electron-builder-binaries/releases
+toolsets:
+  wine: "1.0.1"
+
+# ---- Windows (.exe) ----
+win:
+  executableName: video-wall-browser
+  icon: build/icon.ico
+  artifactName: ${name}-${version}-${arch}.${ext}
+  # Sidecar MediaMTX Windows — hanya mediamtx.exe (bukan binary Linux).
+  extraResources:
+    - from: resources/bin
+      to: bin
+      filter:
+        - "mediamtx.exe"
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Video Wall Browser
+  # Autostart Windows: via per-machine install + shortcut (lihat README "Autostart Windows").
+  # (Kode autostart di main memakai app.setLoginItemSettings saat runtime.)
+
+# Portable: beri nama TERPISAH dari installer NSIS. Sebelumnya keduanya memakai
+# win.artifactName yang sama (x64.exe), sehingga portable (dibangun terakhir)
+# menimpa installer NSIS. Sekarang: x64-portable.exe.
+portable:
+  artifactName: ${name}-${version}-${arch}-portable.${ext}
+
+# ---- macOS (dmg + zip, unsigned) ----
+# macOS — best-effort cross-build dari host Linux (task t_62594db2, v0.2.2):
+#   - target dmg + zip; zip = fallback aman bila pembuatan dmg bermasalah di host Linux.
+#   - identity: null → PENANDA-TANGANAN DILEWATI (host Linux, tanpa sertifikat Apple/Developer ID).
+#     Catatan runtime: macOS Gatekeeper meminta right-click → Open (dua klik) untuk app unsigned.
+#   - extraResources WAJIB dari resources/bin-darwin/ (binary DARWIN, Mach-O) — BUKAN
+#     resources/bin/ (binary Linux, ELF). Nama file-nya sama (mediamtx) sehingga sumbernya
+#     harus direktori terpisah; runtime mencari bin/mediamtx di
+#     Contents/Resources/bin/mediamtx (src/main/sidecar.ts binaryPath()).
+#   - icon: build/icon.png (512x512) — electron-builder mengonversi ke .icns otomatis.
+#   - dmg.backgroundColor (di blok `dmg:` LEVEL AKAR, bukan di bawah mac — schema v26
+#     menolak properti `dmg` di dalam `mac`) memakai background WARNA agar dmg-builder
+#     TIDAK membaca background.tiff via `sips` (tool macOS, tidak ada di host Linux).
+mac:
+  category: public.app-category.video
+  identity: null
+  icon: build/icon.png
+  artifactName: ${name}-${version}-${arch}.${ext}
+  extraResources:
+    - from: resources/bin-darwin
+      to: bin
+      filter:
+        - mediamtx
+  target:
+    - target: dmg
+      arch:
+        - x64
+    - target: zip
+      arch:
+        - x64
+
+# ---- Opsi DMG (level akar) ----
+dmg:
+  backgroundColor: "#f5f5f7"
+
+# ---- Linux (installer) ----
+linux:
+  icon: build/icon.png
+  category: Multimedia
+  synopsis: Video wall multi-monitor (web + video)
+  artifactName: ${name}-${version}-${arch}.${ext}
+  # Sidecar MediaMTX Linux — hanya mediamtx (bukan .exe).
+  extraResources:
+    - from: resources/bin
+      to: bin
+      filter:
+        - "mediamtx"
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+    - target: rpm
+      arch: [x64]
+
+# AppImage: SUID sandbox Chromium (dibutuhkan agar VA-API/GPU decode jalan di kiosk)
+# adalah kekhawatiran RUNTIME, BUKAN opsi electron-builder. `appImage` di
+# electron-builder 26.x hanya menerima: license, compression, artifactName,
+# executableName, category. (Opsi `useSystemSandbox` TIDAK valid — membuat
+# validasi config gagal.) Di runtime kiosk: Electron AppImage memuat
+# chrome-sandbox SUID; bila target tidak punya SUID, jalankan dengan `--no-sandbox`.
+
+# Tidak publish ke anywhere (build lokal / internal).
+publish: null

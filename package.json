@@ -1,0 +1,55 @@
+{
+  "name": "video-wall-browser",
+  "productName": "Video Wall Browser",
+  "version": "0.2.4",
+  "description": "Video Wall Browser - video wall multi-monitor (web + video) untuk Windows dan Linux",
+  "main": "./out/main/index.js",
+  "author": {
+    "name": "Video Wall Browser",
+    "email": "renevuptktku@gmail.com"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:windowed": "electron-vite dev -- --windowed",
+    "dev:virtual": "electron-vite dev -- --virtual-displays=4",
+    "build": "npm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit --composite false -p tsconfig.node.json && tsc --noEmit --composite false -p tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "fetch:mediamtx": "node scripts/fetch-mediamtx.mjs",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:dir": "npm run build && electron-builder --dir --publish never",
+    "postinstall": "node node_modules/electron/install.js"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^6.0.0",
+    "hls.js": "^1.7.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4",
+    "zustand": "^5.0.15"
+  },
+  "homepage": "https://example.com/video-wall-browser",
+  "desktopName": "video-wall-browser.desktop"
+}

@@ -1,0 +1,121 @@
+import { useState } from 'react'
+import { STRIP_RATIO } from '@shared/panelGeometry'
+import type { LiveBanner } from '@shared/types'
+
+/**
+ * Overlay banner pengumuman di wall. State datang dari main (WallUiState.banner).
+ * Dua mode tampilan (field `banner.banner.mode`):
+ * - cover (default) — menutupi seluruh jendela, di atas semua tile (tile disembunyikan dari main).
+ * - strip — pita di bagian atas wall (±12% tinggi jendela, STRIP_RATIO); tile TETAP TERLIHAT
+ *   di bawahnya (main menggeser bounds tile setinggi strip; tinggi CSS di sini memakai
+ *   rasio yang sama agar persis).
+ * - Banner `pinned` tidak punya tombol tutup (hanya operator yang bisa menutup).
+ * - Tombol tutup memanggil wallApi.closeBanner() → main menolak bila pinned.
+ */
+export function BannerOverlay({ banner, top = 0 }: { banner: LiveBanner; /** Mode Atur: strip di bawah toolbar. */ top?: number }): React.JSX.Element {
+  const [busy, setBusy] = useState(false)
+  const [denied, setDenied] = useState<string | null>(null)
+
+  const close = async (): Promise<void> => {
+    setBusy(true)
+    setDenied(null)
+    try {
+      const res = await window.wallApi.closeBanner()
+      if (!res.ok) setDenied(res.error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const closeBtn = (cls = '') =>
+    !banner.banner.pinned ? (
+      <button
+        className={`${cls} rounded border px-4 py-1.5 text-sm opacity-90 hover:opacity-100`}
+        style={{ borderColor: 'currentColor' }}
+        onClick={() => void close()}
+        disabled={busy}
+      >
+        {busy ? 'Menutup…' : 'Tutup pengumuman'}
+      </button>
+    ) : null
+  const deniedEl = denied ? (
+    <div className="rounded bg-black/20 px-3 py-1 text-xs" style={{ color: banner.banner.fgColor }}>
+      {denied}
+    </div>
+  ) : null
+
+  // MODE STRIP — pita di atas; tile di bawah tetap terlihat (digerakkan main lewat inset).
+  // v0.2.2 — fix overflow vertikal: semua konten (label, teks, tombol) PASTI muat di dalam
+  // strip untuk panjang teks apa pun, via auto-fit:
+  // - Label dipindah ke satu baris horizontal dengan tombol (hemat tinggi vertikal).
+  // - fontSize teks = min(fontSize banner, budget tinggi / (2 baris × leading)),
+  //   teks lebih dari 2 baris dipotong ellipsis (-webkit-line-clamp: 2) — tidak meluap.
+  // Tinggi strip TETAP STRIP_RATIO (12%) → inset tile di main tidak berubah.
+  if (banner.banner.mode === 'strip') {
+    const stripH = window.innerHeight * STRIP_RATIO
+    const FIXED_H = 46 // padding (8) + baris header label/tombol (~34) + gap (4) — estimasi konservatif
+    const MAX_LINES = 2
+    const LINE_H = 1.4 // sedikit di atas leading-snug (1.375) supaya aman
+    const textBudget = Math.max(16, stripH - FIXED_H)
+    const maxFont = Math.max(12, Math.floor(textBudget / (MAX_LINES * LINE_H)))
+    const fontSize = Math.min(banner.banner.fontSize, maxFont)
+    return (
+      <div
+        className="fixed inset-x-0 z-[100] flex flex-col justify-center px-4 py-1 text-center"
+        style={{
+          top,
+          height: `${STRIP_RATIO * 100}%`,
+          backgroundColor: banner.banner.bgColor,
+          color: banner.banner.fgColor,
+          overflow: 'hidden'
+        }}
+        role="alert"
+        aria-live="assertive"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="truncate text-xs font-semibold uppercase tracking-[0.25em] opacity-80">{banner.banner.title}</div>
+          {closeBtn()}
+        </div>
+        <p
+          className="mt-1 font-bold leading-snug"
+          style={{
+            fontSize,
+            wordBreak: 'break-word',
+            display: '-webkit-box',
+            WebkitLineClamp: MAX_LINES,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden'
+          }}
+        >
+          {banner.banner.text}
+        </p>
+        {deniedEl}
+      </div>
+    )
+  }
+
+  // MODE COVER (default) — fullscreen menutupi seluruh wall.
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 px-8 text-center"
+      style={{ backgroundColor: banner.banner.bgColor, color: banner.banner.fgColor }}
+      role="alert"
+      aria-live="assertive"
+    >
+      {banner.banner.title && (
+        <div className="text-sm font-semibold uppercase tracking-[0.3em] opacity-80" style={{ fontSize: Math.max(14, banner.banner.fontSize / 5) }}>
+          {banner.banner.title}
+        </div>
+      )}
+      <p
+        className="max-w-[90ch] font-bold leading-snug"
+        style={{ fontSize: banner.banner.fontSize, wordBreak: 'break-word' }}
+      >
+        {banner.banner.text}
+      </p>
+
+      {closeBtn('mt-2')}
+      {deniedEl}
+    </div>
+  )
+}

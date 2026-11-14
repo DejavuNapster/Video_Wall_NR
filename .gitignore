@@ -1,0 +1,45 @@
+# Dependensi
+node_modules/
+
+# Hasil build (npm run build / npm run dist:*)
+out/
+dist/
+dist-*/
+*.tsbuildinfo
+
+# Binary sidecar MediaMTX — unduh ulang dengan `npm run fetch:mediamtx`
+resources/bin/*
+resources/bin-darwin/
+!resources/bin/.mediamtx-version
+
+# Environment & rahasia
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Log & cache
+*.log
+npm-debug.log*
+.cache/
+.vite/
+coverage/
+
+# Artefak pengembangan/rilis lama (lokal saja)
+release-v0*/
+smoke-v0*/
+smoke-cdp.mjs
+scripts/banner-modes.mjs
+RECOVERY_NOTES.md
+RELEASE-v*.md
+
+# Editor & OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+Screenshot*.png

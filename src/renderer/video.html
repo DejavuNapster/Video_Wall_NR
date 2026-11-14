@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Video</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+      #stage,
+      #stage video,
+      #stage img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+      #msg {
+        position: fixed;
+        inset: auto 0 0 0;
+        padding: 6px 10px;
+        font: 13px/1.4 system-ui, sans-serif;
+        color: #fcd34d;
+        background: rgba(2, 6, 23, 0.75);
+        text-align: center;
+      }
+      #msg:empty {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="msg"></div>
+    <script type="module" src="./src/video/main.ts"></script>
+  </body>
+</html>

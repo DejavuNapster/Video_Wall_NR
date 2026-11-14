@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #020617;
+  color: #e2e8f0;
+  color-scheme: dark;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Kolom angka tanpa tombol putar bawaan (lebih rapi di form padat). */
+input[type='number']::-webkit-inner-spin-button {
+  opacity: 0.4;
+}
