@@ -120,7 +120,7 @@ export function SettingsPanel(): React.JSX.Element | null {
       </Section>
 
       <p className="px-1 text-xs text-slate-500">
-        Video Wall Browser v{app.version} · {app.platform.os}
+        Video Wall NR v{app.version} · {app.platform.os}
         {app.platform.session !== 'n/a' ? ` (${app.platform.session})` : ''} · Pintasan global: Ctrl+Alt+O tampilkan Operator, Ctrl+Alt+W tampilkan wall, Ctrl+Alt+Q keluar
       </p>
     </div>

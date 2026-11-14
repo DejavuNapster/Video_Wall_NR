@@ -4,7 +4,7 @@ import { hasEnabledSchedule } from '@shared/schedule'
 import type { Result } from '@shared/types'
 import { mergeSettings, type PresetAction, type SettingsPatch } from '@shared/wallPayloads'
 import { ActivePresetService } from './activePreset'
-import { autostartStatus, setAutostart } from './autostart'
+import { autostartStatus, repairAutostart, setAutostart } from './autostart'
 import { BackupService } from './backupService'
 import { BannerController } from './banner'
 import { dataPath, detectPlatform, flags } from './config'
@@ -12,6 +12,7 @@ import { CredentialVault } from './credentials'
 import { DisplayManager } from './displays'
 import { registerHandlers } from './handlers'
 import { createLogger } from './logger'
+import { migrateLegacyUserData } from './migrate'
 import { createOperatorWindow, forceCloseOperator } from './operator'
 import { RotationController } from './rotation'
 import { ScheduleController } from './schedule'
@@ -62,6 +63,7 @@ function showOperator(): void {
 
 async function bootstrap(): Promise<void> {
   Menu.setApplicationMenu(null)
+  repairAutostart()
 
   const settings = new SettingsStore(dataPath('settings.json'))
   await settings.load()
@@ -311,6 +313,9 @@ async function bootstrap(): Promise<void> {
       })
   })
 }
+
+// Sebelum kunci instance & log pertama: keduanya memakai folder userData.
+migrateLegacyUserData()
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()

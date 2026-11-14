@@ -146,7 +146,7 @@ export function SettingsMenu({ className }: { className: string }): React.JSX.El
            className={`${item} text-red-300`}
            onClick={() => {
              close()
-             if (window.confirm('Keluar dari Video Wall Browser? Semua monitor wall akan ditutup.')) void run(window.wallApi.quit())
+             if (window.confirm('Keluar dari Video Wall NR? Semua monitor wall akan ditutup.')) void run(window.wallApi.quit())
            }}
          >
            Keluar aplikasi

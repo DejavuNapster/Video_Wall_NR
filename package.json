@@ -1,11 +1,11 @@
 {
   "name": "video-wall-browser",
-  "productName": "Video Wall Browser",
-  "version": "0.2.4",
-  "description": "Video Wall Browser - video wall multi-monitor (web + video) untuk Windows, Linux, dan macOS",
+  "productName": "Video Wall NR",
+  "version": "0.2.5",
+  "description": "Video Wall NR - video wall multi-monitor (web + video) untuk Windows, Linux, dan macOS",
   "main": "./out/main/index.js",
   "author": {
-    "name": "Video Wall Browser",
+    "name": "Video Wall NR",
     "email": "renevuptktku@gmail.com"
   },
   "license": "UNLICENSED",

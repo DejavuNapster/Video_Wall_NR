@@ -31,11 +31,11 @@ chmod +x Video_Wall_NR_v<versi>_Linux_x86_64.AppImage
 ./Video_Wall_NR_v<versi>_Linux_x86_64.AppImage
 ```
 
-**macOS** — buka `.dmg`, seret *Video Wall Browser* ke *Applications*. Aplikasi belum ditandatangani Apple
+**macOS** — buka `.dmg`, seret *Video Wall NR* ke *Applications*. Aplikasi belum ditandatangani Apple
 Developer ID, jadi Gatekeeper menolaknya saat pertama dibuka. Jalankan sekali di Terminal:
 
 ```bash
-xattr -cr "/Applications/Video Wall Browser.app"
+xattr -cr "/Applications/Video Wall NR.app"
 ```
 
 lalu buka seperti biasa (atau klik-kanan → *Open*).

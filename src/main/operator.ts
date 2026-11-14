@@ -15,7 +15,7 @@ export function createOperatorWindow(showWhenReady: boolean | 'minimized'): Brow
     height: Math.min(900, wa.height - 48),
     show: false,
     backgroundColor: '#0b0f14',
-    title: 'Video Wall Browser - Operator',
+    title: 'Video Wall NR - Operator',
     autoHideMenuBar: true,
     webPreferences: {
       preload: preloadPath(),

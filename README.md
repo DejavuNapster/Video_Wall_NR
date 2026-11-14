@@ -1,4 +1,4 @@
-# Video Wall Browser (PoC)
+# Video Wall NR (PoC)
 
 Aplikasi desktop video wall multi-monitor untuk **Windows** (.exe), **Linux** (.deb / AppImage), dan **macOS** (.dmg, Intel + Apple Silicon).
 Unduh installer dari halaman [Releases](../../releases).
@@ -201,7 +201,7 @@ git push origin main v0.2.4
 Ikon Windows memakai `build/icon.ico` yang sudah jadi; Linux/macOS memakai `build/icon.png` (512×512).
 Installer belum ditandatangani: Windows SmartScreen memperingatkan saat pertama dijalankan, dan macOS hanya diberi
 tanda tangan ad-hoc (`build/afterPack.cjs`) sehingga Gatekeeper perlu dibuka sekali
-(`xattr -cr "/Applications/Video Wall Browser.app"` atau klik-kanan → Open).
+(`xattr -cr "/Applications/Video Wall NR.app"` atau klik-kanan → Open).
 
 `appId` = `itsupport.videowallbrowser` (di `electron-builder.yml`). **Jangan diubah setelah aplikasi
 terpasang**: Windows akan menganggapnya aplikasi lain (dua entri uninstall/shortcut).
@@ -213,7 +213,7 @@ terpasang**: Windows akan menganggapnya aplikasi lain (dua entri uninstall/short
 - **Ubuntu / Debian**: `sudo apt install ./Video_Wall_NR_v<versi>_Linux_amd64.deb`
 - **Linux lain**: `chmod +x Video_Wall_NR_v<versi>_Linux_x86_64.AppImage` lalu jalankan.
 - **macOS**: buka `.dmg` (`macOS_arm64` untuk Apple Silicon, `macOS_x64` untuk Intel), seret ke *Applications*, lalu
-  `xattr -cr "/Applications/Video Wall Browser.app"` sekali sebelum dibuka.
+  `xattr -cr "/Applications/Video Wall NR.app"` sekali sebelum dibuka.
 
 ### X11 vs Wayland
 
@@ -231,7 +231,8 @@ terpasang**: Windows akan menganggapnya aplikasi lain (dua entri uninstall/short
 | Log aplikasi | `logs/main.log` (rotasi 5 MB) |
 | Metrik per tile | `logs/metrics.csv` (tiap 10 detik, rotasi 50 MB) |
 
-Linux: `~/.config/Video Wall Browser`, Windows: `%APPDATA%\Video Wall Browser` (mengikuti `productName`).
+Linux: `~/.config/Video Wall NR`, Windows: `%APPDATA%\Video Wall NR` (mengikuti `productName`).
+Data dari nama lama (`Video Wall Browser`) dipindahkan otomatis saat versi baru pertama kali dijalankan.
 
 ## Keamanan (ringkas)
 

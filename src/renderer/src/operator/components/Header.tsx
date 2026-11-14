@@ -32,7 +32,7 @@ export function Header(): React.JSX.Element {
     <header className="border-b border-slate-800 bg-slate-900/70">
       <div className="flex h-12 items-center gap-3 px-4">
         <h1 className="flex items-center gap-2 text-sm font-semibold tracking-wide">
-          Video Wall Browser
+          Video Wall NR
           <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-normal text-slate-400">v{app.version}</span>
         </h1>
         <span className="text-xs text-slate-400">

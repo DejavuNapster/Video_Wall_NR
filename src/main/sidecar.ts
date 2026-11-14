@@ -42,7 +42,7 @@ export function withCredentials(url: string, username?: string, password?: strin
  * per sesi, dan pengguna anonim hanya boleh membaca stream.
  */
 export function buildMediaMtxConfig(ports: { api: number; hls: number; webrtc: number }, apiToken: string): string {
-  return `# Dibuat otomatis oleh Video Wall Browser. Jangan diedit; akan ditimpa saat aplikasi start.
+  return `# Dibuat otomatis oleh Video Wall NR. Jangan diedit; akan ditimpa saat aplikasi start.
 logLevel: warn
 api: yes
 apiAddress: 127.0.0.1:${ports.api}

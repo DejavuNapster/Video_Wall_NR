@@ -1,8 +1,9 @@
 # Rekonstruksi dari README + source (file asli hilang di region korup ZIP).
 # Sumber fakta: README.md, package.json, src/main/sidecar.ts (binaryPath -> resourcePath('bin', 'mediamtx(.exe)')).
+# appId TETAP sama walau nama aplikasi diganti: installer memperbarui instalasi lama, bukan memasang aplikasi kedua.
 appId: itsupport.videowallbrowser
-productName: Video Wall Browser
-copyright: Copyright © 2026 Video Wall Browser
+productName: Video Wall NR
+copyright: Copyright © 2026 Video Wall NR
 # electron, electron-builder versi diambil otomatis dari package.json.
 
 directories:
@@ -59,7 +60,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Video Wall Browser
+  shortcutName: Video Wall NR
   # Autostart Windows: via per-machine install + shortcut (lihat README "Autostart Windows").
   # (Kode autostart di main memakai app.setLoginItemSettings saat runtime.)
 
@@ -71,7 +72,7 @@ portable:
 # Dibangun di runner macOS GitHub Actions (.github/workflows/release.yml).
 #   - identity: null → tanpa sertifikat Apple Developer ID; build/afterPack.cjs memberi tanda tangan
 #     ad-hoc agar app bisa dijalankan di Apple Silicon. Gatekeeper tetap memperingatkan app unsigned:
-#     buka lewat klik-kanan → Open, atau `xattr -cr "/Applications/Video Wall Browser.app"`.
+#     buka lewat klik-kanan → Open, atau `xattr -cr "/Applications/Video Wall NR.app"`.
 #   - MediaMTX darwin per arsitektur di resources/bin-darwin-<arch>/ (npm run fetch:mediamtx dengan
 #     MEDIAMTX_PLATFORM=darwin MEDIAMTX_ARCH=x64|arm64); ${arch} diganti electron-builder saat packaging.
 #   - icon: build/icon.png (512x512) — dikonversi ke .icns otomatis.

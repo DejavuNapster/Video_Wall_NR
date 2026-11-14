@@ -24,6 +24,19 @@ export function autostartStatus(): AutostartStatus {
   return { supported: false, enabled: false, reason: `Tidak didukung di ${process.platform}` }
 }
 
+/**
+ * Windows: entri jalan otomatis menyimpan path exe. Setelah update yang memindah folder instalasi (mis. nama
+ * aplikasi berganti), entri lama menunjuk exe yang sudah tidak ada. Daftarkan ulang ke exe saat ini.
+ */
+export function repairAutostart(): void {
+  if (!app.isPackaged || process.platform !== 'win32') return
+  const current = app.getLoginItemSettings({ args: LOGIN_ARGS })
+  if (current.openAtLogin) return
+  const exe = process.execPath.toLowerCase()
+  const stale = current.launchItems.some((item) => item.enabled && item.path.toLowerCase() !== exe && /video-wall-browser\.exe$/i.test(item.path))
+  if (stale) app.setLoginItemSettings({ openAtLogin: true, args: LOGIN_ARGS })
+}
+
 export async function setAutostart(on: boolean): Promise<Result> {
   const status = autostartStatus()
   if (!status.supported) return { ok: false, error: status.reason ?? 'Tidak didukung' }
@@ -36,7 +49,7 @@ export async function setAutostart(on: boolean): Promise<Result> {
     const desktop = [
       '[Desktop Entry]',
       'Type=Application',
-      'Name=Video Wall Browser',
+      'Name=Video Wall NR',
       `Exec="${exec}" ${LOGIN_ARGS.join(' ')}`,
       'X-GNOME-Autostart-enabled=true',
       ''
