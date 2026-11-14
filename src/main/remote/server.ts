@@ -5,8 +5,10 @@ import { BANNER_THEMES } from '@shared/bannerThemes'
 import { EmergencyBannerSchema } from '@shared/schema'
 import { tileSummary } from '@shared/tileSummary'
 import type { AppState, EmergencyBanner, RemoteStatus, Result, Thumbnails } from '@shared/types'
+import { cyclePages } from '@shared/webPanel'
 import { createLogger } from '../logger'
 import { LoginLimiter, SessionStore, verifyPassword } from './auth'
+import { MONITOR_ACTIONS, type RemoteMonitorAction, type RemoteTileAction, TILE_ACTIONS } from './control'
 import clientCss from './client.css?raw'
 import clientHtml from './client.html?raw'
 import clientJs from './client.js?raw'
@@ -27,6 +29,18 @@ export interface RemoteDeps {
   showBanner: (banner: EmergencyBanner) => void
   clearBanner: () => void
   reloadTile: (tileId: string) => boolean
+  /** Kendali wall: navigasi/layar penuh/zoom panel, ganti URL, aksi monitor, preset sebelumnya/berikutnya. */
+  control: {
+    tile(tileId: string, action: RemoteTileAction): Promise<Result>
+    setUrl(tileId: string, url: string): Promise<Result>
+    monitor(slot: number, action: RemoteMonitorAction): Result
+    stepPreset(dir: 1 | -1): Promise<Result>
+    monitorView(slot: number): {
+      panelFullscreenTileId: string | null
+      windowFullscreen: boolean
+      cyclePositions: Record<string, { index: number; total: number }>
+    } | null
+  }
   /** Status server berubah (mulai / berhenti / gagal) → perbarui UI Operator. */
   onStatus: () => void
 }
@@ -190,6 +204,22 @@ export class RemoteServer {
         const body = parse(z.object({ id }), await readBody(req))
         return sendResult(res, this.d.reloadTile(body.id) ? { ok: true } : { ok: false, error: 'Panel tidak sedang tampil di wall' })
       }
+      case 'POST /api/tile/action': {
+        const body = parse(z.object({ id, action: z.enum(TILE_ACTIONS) }), await readBody(req))
+        return sendResult(res, await this.d.control.tile(body.id, body.action))
+      }
+      case 'POST /api/tile/url': {
+        const body = parse(z.object({ id, url: z.string().trim().min(1, 'URL tidak boleh kosong').max(2048) }), await readBody(req))
+        return sendResult(res, await this.d.control.setUrl(body.id, body.url))
+      }
+      case 'POST /api/monitor/action': {
+        const body = parse(z.object({ slot: z.number().int().min(0).max(31), action: z.enum(MONITOR_ACTIONS) }), await readBody(req))
+        return sendResult(res, this.d.control.monitor(body.slot, body.action))
+      }
+      case 'POST /api/preset/step': {
+        const body = parse(z.object({ dir: z.union([z.literal(1), z.literal(-1)]) }), await readBody(req))
+        return sendResult(res, await this.d.control.stepPreset(body.dir))
+      }
     }
     throw new HttpError(404, 'Tidak ditemukan')
   }
@@ -214,19 +244,35 @@ export class RemoteServer {
       themes: BANNER_THEMES,
       monitors: (s.activePreset?.monitors ?? [])
         .filter((m) => wallSlots.has(m.slot))
-        .map((m) => ({
-          slot: m.slot,
-          tiles: m.tiles.map((t) => {
-            const st = s.tileStatus[t.id]
-            return {
-              id: t.id,
-              summary: tileSummary(t),
-              type: t.source.type,
-              state: st?.state ?? null,
-              error: st && st.state !== 'ok' ? st.lastError : undefined
-            }
-          })
-        }))
+        .map((m) => {
+          const view = this.d.control.monitorView(m.slot)
+          return {
+            slot: m.slot,
+            panelFullscreenTileId: view?.panelFullscreenTileId ?? null,
+            windowFullscreen: view?.windowFullscreen ?? false,
+            tiles: m.tiles.map((t) => {
+              const st = s.tileStatus[t.id]
+              const web = t.source.type === 'web' ? t.source : null
+              return {
+                id: t.id,
+                summary: tileSummary(t),
+                type: t.source.type,
+                state: st?.state ?? null,
+                error: st && st.state !== 'ok' ? st.lastError : undefined,
+                ...(web
+                  ? {
+                      url: web.url,
+                      pageUrl: st?.pageUrl || web.url,
+                      canGoBack: st?.canGoBack ?? false,
+                      canGoForward: st?.canGoForward ?? false,
+                      zoom: web.zoom,
+                      cycle: web.cycle ? (view?.cyclePositions[t.id] ?? { index: 1, total: cyclePages(web).length }) : null
+                    }
+                  : {})
+              }
+            })
+          }
+        })
     }
   }
 }

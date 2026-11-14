@@ -47,4 +47,5 @@ lalu buka seperti biasa (atau klik-kanan → *Open*).
 - Panel web berperilaku seperti tab browser: ← → ⟳ ⌂ dan ⧉ buka di panel baru.
 - Panel web dapat menampilkan beberapa dashboard bergantian dan diberi CSS khusus (sembunyikan header/menu).
 - Operator menampilkan pratinjau langsung setiap panel; banner bisa disimpan sebagai templat, dijadwalkan, dan diberi bunyi alarm.
-- Peringatan otomatis ke webhook/Telegram bila panel bermasalah, serta kendali jarak jauh lewat browser di jaringan lokal (Operator › Pengaturan).
+- Peringatan otomatis ke webhook/Telegram bila panel bermasalah (Operator › Pengaturan).
+- Kendali jarak jauh lewat browser di jaringan lokal (Operator › Pengaturan): preset, banner, serta navigasi, layar penuh, zoom, dan ganti URL setiap panel dari ponsel.

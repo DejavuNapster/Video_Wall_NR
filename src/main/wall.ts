@@ -27,6 +27,7 @@ import { createLogger } from './logger'
 import { appendMetrics, type MetricsRow } from './metrics'
 import { type MediaMtxSidecar, mediaPathName, type PathSpec, withCredentials } from './sidecar'
 import { TileView, type TileContext } from './tiles'
+import type { MonitorView } from './remote/control'
 import { WallUiView } from './wallUi'
 
 const log = createLogger('wall')
@@ -210,6 +211,37 @@ export class WallController extends EventEmitter {
     const tv = this.findTile(tileId)
     tv?.reload('diminta operator')
     return tv !== null
+  }
+
+  /** Monitor yang memuat panel ini di preset aktif (null = tidak ada di wall). */
+  slotOfTile(tileId: string): number | null {
+    return this.preset?.monitors.find((m) => m.tiles.some((t) => t.id === tileId))?.slot ?? null
+  }
+
+  /** Keadaan jendela satu monitor (untuk kendali jarak jauh). */
+  monitorView(slot: number): MonitorView | null {
+    const ww = this.windows.get(slot)
+    if (!ww || ww.win.isDestroyed()) return null
+    const pos: Record<string, { index: number; total: number }> = {}
+    for (const tv of ww.tiles.values()) {
+      const p = tv.cyclePosition
+      if (p) pos[tv.tile.id] = p
+    }
+    return { panelFullscreenTileId: ww.panelFullscreen, windowFullscreen: ww.win.isFullScreen(), cyclePositions: pos }
+  }
+
+  /** Muat ulang semua panel di satu monitor. */
+  reloadAllInSlot(slot: number): Result {
+    const ww = this.windows.get(slot)
+    if (!ww) return { ok: false, error: 'Monitor tidak aktif' }
+    for (const tv of ww.tiles.values()) tv.refresh()
+    return { ok: true }
+  }
+
+  /** Halaman rotasi sebelumnya/berikutnya pada panel web yang berotasi. */
+  stepTilePage(slot: number, tileId: string, dir: 1 | -1): Result {
+    const tv = this.windows.get(slot)?.tiles.get(tileId)
+    return tv?.stepPage(dir) ? { ok: true } : { ok: false, error: 'Panel ini tidak memakai rotasi halaman' }
   }
 
   // ---------------------------------------------------------------- API untuk UI wall (per monitor)

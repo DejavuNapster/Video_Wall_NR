@@ -12,6 +12,8 @@ Pembagian tugas:
 
 Semua perubahan (dari wall maupun Operator) langsung tampil di wall dan tersimpan otomatis.
 
+Riwayat perubahan setiap versi ada di [CHANGELOG.md](CHANGELOG.md).
+
 ## Teknologi
 
 | Bagian | Pilihan | Alasan singkat |
@@ -175,9 +177,17 @@ dimatikan). Gunakan **Kirim pesan uji** untuk memeriksa saluran.
 
 ### Kendali jarak jauh
 
-Operasikan wall dari ponsel atau komputer lain di jaringan yang sama melalui browser: ganti preset, Mode
-Tampil / Mode Atur, rotasi preset, tampilkan templat banner atau banner cepat, tutup banner, lihat pratinjau
-setiap panel, dan muat ulang panel.
+Operasikan wall dari ponsel atau komputer lain di jaringan yang sama melalui browser:
+
+- **Tampilan & preset:** Mode Tampil / Mode Atur, rotasi preset, pilih preset, atau preset sebelumnya/berikutnya (◀ ▶).
+- **Banner:** tampilkan templat banner atau banner cepat, tutup banner.
+- **Per monitor:** tampilkan wall di depan aplikasi lain, layar penuh jendela wall, muat ulang semua panel,
+  keluar dari layar penuh panel.
+- **Per panel** (ketuk pratinjau panel): ← kembali, → maju, ⌂ ke URL panel, ⟳ muat ulang, ⛶ layar penuh panel,
+  ⧉ buka di panel baru, zoom (− / + / 100%), halaman rotasi sebelumnya/berikutnya, dan ganti URL panel (juga
+  untuk mengisi panel kosong dengan URL halaman web atau alamat kamera).
+
+Setiap panel menampilkan pratinjau langsung, status, dan alamat halaman yang sedang terbuka.
 
 1. Operator › Pengaturan › **Kendali jarak jauh**: atur password (minimal 8 karakter), lalu aktifkan.
 2. Buka alamat yang ditampilkan (mis. `http://192.168.1.20:8787`) dari perangkat lain dan masuk dengan password.

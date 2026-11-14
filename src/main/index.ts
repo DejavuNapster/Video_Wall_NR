@@ -17,6 +17,7 @@ import { registerHandlers, VAULT_REMOTE_PASSWORD, VAULT_TELEGRAM_TOKEN } from '.
 import { createLogger } from './logger'
 import { migrateLegacyUserData } from './migrate'
 import { createOperatorWindow, forceCloseOperator } from './operator'
+import { WallRemoteControl } from './remote/control'
 import { RemoteServer } from './remote/server'
 import { RotationController } from './rotation'
 import { ScheduleController } from './schedule'
@@ -220,6 +221,15 @@ async function bootstrap(): Promise<void> {
     },
     telegramToken: () => vault.get(VAULT_TELEGRAM_TOKEN)
   })
+  /** Zoom panel web ±10% / 100% (shortcut Ctrl+= - 0 di wall dan kendali jarak jauh). */
+  const zoomTile = async (slot: number, tileId: string, dir: 'in' | 'out' | 'reset'): Promise<Result> => {
+    const tile = svc.current?.monitors.find((m) => m.slot === slot)?.tiles.find((t) => t.id === tileId)
+    if (tile?.source.type !== 'web') return { ok: false, error: 'Zoom hanya untuk panel halaman web' }
+    const step = dir === 'in' ? 0.1 : -0.1
+    const zoom = dir === 'reset' ? 1 : Math.min(5, Math.max(0.25, Math.round((tile.source.zoom + step) * 100) / 100))
+    return zoom === tile.source.zoom ? { ok: true } : svc.edit(slot, { op: 'setZoom', tileId, zoom })
+  }
+
   remote = new RemoteServer({
     settings: () => settings.get().remote,
     passwordHash: () => vault.get(VAULT_REMOTE_PASSWORD),
@@ -230,6 +240,14 @@ async function bootstrap(): Promise<void> {
     showBanner: (b) => bannerCtl.set(b),
     clearBanner: () => bannerCtl.clear(),
     reloadTile: (tileId) => wall.reloadTile(tileId),
+    control: new WallRemoteControl({
+      wall,
+      zoomTile,
+      setSource: (slot, tileId, input) => svc.edit(slot, { op: 'setSource', tileId, input }),
+      presetIds: () => hub?.presetList.map((p) => p.id) ?? [],
+      activeId: () => svc.activeId,
+      activatePreset: (id) => svc.activate(id)
+    }),
     onStatus: () => hub?.notify()
   })
   const remoteServer = remote
@@ -250,11 +268,9 @@ async function bootstrap(): Promise<void> {
       })
     },
     zoomTile: (slot, tileId, dir) => {
+      // Panel non-web diam saja (shortcut berlaku untuk panel aktif apa pun jenisnya).
       const tile = svc.current?.monitors.find((m) => m.slot === slot)?.tiles.find((t) => t.id === tileId)
-      if (tile?.source.type !== 'web') return
-      const step = dir === 'in' ? 0.1 : -0.1
-      const zoom = dir === 'reset' ? 1 : Math.min(5, Math.max(0.25, Math.round((tile.source.zoom + step) * 100) / 100))
-      if (zoom !== tile.source.zoom) void svc.edit(slot, { op: 'setZoom', tileId, zoom }).then((r) => report(slot, r))
+      if (tile?.source.type === 'web') void zoomTile(slot, tileId, dir).then((r) => report(slot, r))
     },
     activatePresetIndex: (index) => {
       const id = hub?.presetList[index]?.id

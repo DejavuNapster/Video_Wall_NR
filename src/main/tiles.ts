@@ -154,6 +154,17 @@ export class TileView {
     this.reload('kembali ke URL panel')
   }
 
+  /** Pindah ke halaman rotasi sebelumnya/berikutnya; timer rotasi dimulai ulang. false bila panel tidak berotasi. */
+  stepPage(dir: 1 | -1): boolean {
+    const src = this.tile.source
+    if (this.destroyed || src.type !== 'web' || !src.cycle) return false
+    const total = cyclePages(src).length
+    this.cycleIndex = (this.cycleIndex + dir + total) % total
+    this.armCycle()
+    this.reload(`pindah ke halaman rotasi ${this.cycleIndex + 1}/${total}`)
+    return true
+  }
+
   /** Halaman rotasi yang sedang tampil (1-based) dan jumlahnya; null bila panel tidak berotasi. */
   get cyclePosition(): { index: number; total: number } | null {
     const src = this.tile.source

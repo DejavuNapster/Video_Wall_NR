@@ -67,6 +67,13 @@ describe('RemoteServer (HTTP)', () => {
     showBanner: vi.fn(),
     clearBanner: vi.fn(),
     reloadTile: vi.fn(() => true),
+    control: {
+      tile: vi.fn(async () => ({ ok: true as const })),
+      setUrl: vi.fn(async () => ({ ok: true as const })),
+      monitor: vi.fn(() => ({ ok: true as const })),
+      stepPreset: vi.fn(async () => ({ ok: true as const })),
+      monitorView: vi.fn(() => ({ panelFullscreenTileId: null, windowFullscreen: true, cyclePositions: {} }))
+    },
     onStatus: vi.fn()
   }
   const server = new RemoteServer(deps)
@@ -119,6 +126,36 @@ describe('RemoteServer (HTTP)', () => {
     expect((await post('/api/preset', { id: '../x' })).status).toBe(400)
     const thumbs = (await (await fetch(base + '/api/thumbnails', { headers: { cookie } })).json()) as { thumbnails: object }
     expect(thumbs.thumbnails).toHaveProperty('t1')
+  })
+
+  it('kendali wall: aksi panel, ganti URL, aksi monitor, preset berikutnya', async () => {
+    const st = (await (await fetch(base + '/api/state', { headers: { cookie } })).json()) as {
+      monitors: Array<{ slot: number; windowFullscreen: boolean; panelFullscreenTileId: string | null; tiles: Array<{ id: string }> }>
+    }
+    expect(st.monitors[0]).toMatchObject({ slot: 0, windowFullscreen: true, panelFullscreenTileId: null })
+    const tileId = st.monitors[0]!.tiles[0]!.id
+
+    expect((await post('/api/tile/action', { id: tileId, action: 'fullscreen' })).status).toBe(200)
+    expect(deps.control.tile).toHaveBeenCalledWith(tileId, 'fullscreen')
+    expect((await post('/api/tile/action', { id: tileId, action: 'zoomIn' })).status).toBe(200)
+    expect((await post('/api/tile/action', { id: tileId, action: 'hapus' })).status).toBe(400)
+
+    expect((await post('/api/tile/url', { id: tileId, url: ' https://grafana.lan/d/1 ' })).status).toBe(200)
+    expect(deps.control.setUrl).toHaveBeenCalledWith(tileId, 'https://grafana.lan/d/1')
+    expect((await post('/api/tile/url', { id: tileId, url: '   ' })).status).toBe(400)
+
+    expect((await post('/api/monitor/action', { slot: 0, action: 'reloadAll' })).status).toBe(200)
+    expect(deps.control.monitor).toHaveBeenCalledWith(0, 'reloadAll')
+    expect((await post('/api/monitor/action', { slot: -1, action: 'show' })).status).toBe(400)
+
+    expect((await post('/api/preset/step', { dir: 1 })).status).toBe(200)
+    expect(deps.control.stepPreset).toHaveBeenCalledWith(1)
+    expect((await post('/api/preset/step', { dir: 2 })).status).toBe(400)
+
+    deps.control.tile.mockResolvedValueOnce({ ok: false, error: 'Tidak ada halaman sebelumnya' } as never)
+    const res = await post('/api/tile/action', { id: tileId, action: 'back' })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ ok: false, error: 'Tidak ada halaman sebelumnya' })
   })
 
   it('ganti password mengeluarkan semua sesi', async () => {

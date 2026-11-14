@@ -80,6 +80,9 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Catatan rilis (perubahan versi ini dari CHANGELOG.md)
+        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME}" > release-body.md && cat release-body.md
+
       - name: Checksum SHA-256
         working-directory: artifacts
         run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
@@ -87,5 +90,5 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           name: Video Wall NR ${{ github.ref_name }}
-          body_path: .github/release-notes.md
+          body_path: release-body.md
           files: artifacts/*
