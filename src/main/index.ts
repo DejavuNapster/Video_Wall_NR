@@ -1,3 +1,4 @@
+import { hostname } from 'node:os'
 import { app, type BrowserWindow, globalShortcut, Menu, powerSaveBlocker } from 'electron'
 import { createDefaultPreset } from '@shared/layout'
 import { hasEnabledSchedule } from '@shared/schedule'
@@ -25,6 +26,7 @@ import { ScheduleController } from './schedule'
 import { MediaMtxSidecar } from './sidecar'
 import { StateHub } from './state'
 import { PresetStore, SettingsStore } from './store'
+import { TelegramControl } from './telegram/bot'
 import { WallController } from './wall'
 import { registerWallHandlers } from './wallHandlers'
 
@@ -87,6 +89,7 @@ async function bootstrap(): Promise<void> {
   let schedule: ScheduleController | null = null
   let banner: BannerController | null = null
   let remote: RemoteServer | null = null
+  let telegram: TelegramControl | null = null
   let telegramTokenSet = await vault.has(VAULT_TELEGRAM_TOKEN)
 
   /**
@@ -120,7 +123,8 @@ async function bootstrap(): Promise<void> {
     autostart: autostartStatus,
     banner: () => banner?.get() ?? null,
     remote: () => remote?.status() ?? { running: false, urls: [], passwordSet: false },
-    telegramTokenSet: () => telegramTokenSet
+    telegramTokenSet: () => telegramTokenSet,
+    telegram: () => telegram?.status() ?? { running: false }
   })
   sidecar.on('state', () => hub?.notify())
   banner = new BannerController({
@@ -190,6 +194,7 @@ async function bootstrap(): Promise<void> {
     if (!res.ok) return res
     if (patch.bannerSchedule || patch.bannerTemplates) bannerScheduler.restart()
     if (patch.remote) await remoteServer.apply()
+    if (patch.telegram) await telegramCtl.apply()
     if (patch.mediaMtxEnabled !== undefined && patch.mediaMtxEnabled !== cur.mediaMtx.enabled) {
       void sidecar
         .stop()
@@ -215,10 +220,10 @@ async function bootstrap(): Promise<void> {
     statuses: () => wall.statusSnapshot(),
     describe: (tileId) => {
       for (const m of svc.current?.monitors ?? []) {
-        const tile = m.tiles.find((t) => t.id === tileId)
-        if (tile) return `"${tileSummary(tile)}" (monitor ${m.slot + 1})`
+        const i = m.tiles.findIndex((t) => t.id === tileId)
+        if (i >= 0) return { name: tileSummary(m.tiles[i]!), monitor: m.slot + 1, ref: `${m.slot + 1}.${i + 1}` }
       }
-      return `panel ${tileId}`
+      return { name: `panel ${tileId}`, monitor: null, ref: null }
     },
     telegramToken: () => vault.get(VAULT_TELEGRAM_TOKEN)
   })
@@ -230,6 +235,17 @@ async function bootstrap(): Promise<void> {
     const zoom = dir === 'reset' ? 1 : Math.min(5, Math.max(0.25, Math.round((tile.source.zoom + step) * 100) / 100))
     return zoom === tile.source.zoom ? { ok: true } : svc.edit(slot, { op: 'setZoom', tileId, zoom })
   }
+
+  /** Perintah wall dari kendali jarak jauh (browser) dan Telegram. */
+  const remoteControl = new WallRemoteControl({
+    wall,
+    zoomTile,
+    setSource: (slot, tileId, input) => svc.edit(slot, { op: 'setSource', tileId, input }),
+    removeTile: (slot, tileId) => svc.edit(slot, { op: 'removeTile', tileId }),
+    presetIds: () => hub?.presetList.map((p) => p.id) ?? [],
+    activeId: () => svc.activeId,
+    activatePreset: (id) => svc.activate(id)
+  })
 
   remote = new RemoteServer({
     settings: () => settings.get().remote,
@@ -250,19 +266,33 @@ async function bootstrap(): Promise<void> {
     showBanner: (b) => bannerCtl.set(b),
     clearBanner: () => bannerCtl.clear(),
     reloadTile: (tileId) => wall.reloadTile(tileId),
-    control: new WallRemoteControl({
-      wall,
-      zoomTile,
-      setSource: (slot, tileId, input) => svc.edit(slot, { op: 'setSource', tileId, input }),
-      removeTile: (slot, tileId) => svc.edit(slot, { op: 'removeTile', tileId }),
-      presetIds: () => hub?.presetList.map((p) => p.id) ?? [],
-      activeId: () => svc.activeId,
-      activatePreset: (id) => svc.activate(id)
-    }),
+    control: remoteControl,
     onStatus: () => hub?.notify()
   })
   const remoteServer = remote
   const hubRef = hub
+
+  // Kendali lewat perintah bot Telegram (memakai token bot peringatan).
+  telegram = new TelegramControl({
+    settings: () => settings.get().telegram,
+    alertChatId: () => settings.get().alerts.telegramChatId,
+    token: () => vault.get(VAULT_TELEGRAM_TOKEN),
+    wall: {
+      host: () => hostname(),
+      state: () => hubRef.build(),
+      activatePreset: (id) => svc.activate(id),
+      stepPreset: (dir) => remoteControl.stepPreset(dir),
+      setDisplayMode: (on) => applySettings({ wall: { displayMode: on } }),
+      setRotation: (on) => applySettings({ wall: { rotation: { enabled: on } } }),
+      showBanner: (b) => bannerCtl.set(b),
+      clearBanner: () => bannerCtl.clear(),
+      reloadMonitor: (slot) => wall.reloadAllInSlot(slot),
+      reloadTile: (slot, tileId) => wall.reloadTileInSlot(slot, tileId),
+      capture: (tileId) => wall.captureTileImage(tileId, 1600)
+    },
+    onStatus: () => hub?.notify()
+  })
+  const telegramCtl = telegram
 
   /** Beritahu jendela wall bila aksi shortcut gagal. */
   const report = (slot: number, res: Result): void => {
@@ -320,11 +350,13 @@ async function bootstrap(): Promise<void> {
       rebalanceTimers()
       bannerScheduler.restart()
       await remoteServer.apply()
+      await telegramCtl.apply()
     },
     remote: remoteServer,
     alerts: alertMonitor,
     secretsChanged: async () => {
       telegramTokenSet = await vault.has(VAULT_TELEGRAM_TOKEN)
+      await telegramCtl.apply()
       hub?.notify()
     }
   })
@@ -342,6 +374,7 @@ async function bootstrap(): Promise<void> {
   alertMonitor.start()
   bannerScheduler.restart()
   void remoteServer.apply().catch((err) => log.error('kendali jarak jauh gagal mulai', err))
+  void telegramCtl.apply().catch((err) => log.error('kendali Telegram gagal mulai', err))
   // Saat startup, --hide-operator membuat Operator dibuat tersembunyi (kiosk); dibuka nanti lewat menu wall / Ctrl+Alt+O.
   // Satu monitor (Operator berbagi layar dengan wall): Operator hanya di taskbar supaya wall langsung terlihat.
   const sharesWallDisplay = displays.list().some((d) => d.primary && d.slot !== null)
@@ -389,7 +422,7 @@ async function bootstrap(): Promise<void> {
     void svc
       .flush()
       .catch(() => undefined)
-      .then(() => Promise.allSettled([wall.shutdown(), sidecar.stop(), remoteServer.stop()]))
+      .then(() => Promise.allSettled([wall.shutdown(), sidecar.stop(), remoteServer.stop(), telegramCtl.stop()]))
       .finally(() => {
         forceCloseOperator(operatorWin)
         app.quit()

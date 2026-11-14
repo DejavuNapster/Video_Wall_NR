@@ -1,6 +1,6 @@
 import { app, type BrowserWindow } from 'electron'
 import { IPC } from '@shared/ipc'
-import type { AppState, AutostartStatus, LiveBanner, PlatformInfo, Preset, PresetMeta, RemoteStatus } from '@shared/types'
+import type { AppState, AutostartStatus, LiveBanner, PlatformInfo, Preset, PresetMeta, RemoteStatus, TelegramStatus } from '@shared/types'
 import { flags, platformWarnings } from './config'
 import type { DisplayManager } from './displays'
 import type { MediaMtxSidecar } from './sidecar'
@@ -22,6 +22,7 @@ export interface StateHubDeps {
   banner: () => LiveBanner | null
   remote: () => RemoteStatus
   telegramTokenSet: () => boolean
+  telegram: () => TelegramStatus
 }
 
 /** Mengumpulkan state aplikasi dan mengirimkannya ke UI operator (dibatasi ~5x per detik). */
@@ -63,7 +64,8 @@ export class StateHub {
       saveError: this.deps.saveError(),
       autostart: this.deps.autostart(),
       remote: this.deps.remote(),
-      telegramTokenSet: this.deps.telegramTokenSet()
+      telegramTokenSet: this.deps.telegramTokenSet(),
+      telegram: this.deps.telegram()
     }
   }
 

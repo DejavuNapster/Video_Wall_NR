@@ -99,6 +99,69 @@ export function AlertSettings(): React.JSX.Element | null {
   )
 }
 
+/** "123, -100456  @grup" → ["123", "-100456", "@grup"] */
+const splitIds = (v: string): string[] => v.split(/[\s,;]+/).filter(Boolean)
+
+/** Kendali wall lewat perintah bot Telegram (bot yang sama dengan peringatan). */
+export function TelegramControlSettings(): React.JSX.Element | null {
+  const app = useOperator((s) => s.app)
+  const { run } = useOperator.getState()
+  if (!app) return null
+  const t = app.settings.telegram
+  const st = app.telegram
+  const update = (telegram: object, okText?: string): void => void run((api) => api.updateSettings({ telegram }), okText)
+
+  return (
+    <Section
+      title="Kendali lewat Telegram"
+      description="Kendalikan wall dengan perintah ke bot Telegram, dari mana saja dan tanpa membuka port: /status, /foto, /preset, /banner, /muatulang, dan lainnya."
+      actions={
+        !t.enabled ? <Pill tone="muted">Mati</Pill> : st.error ? <Pill tone="error">Gagal</Pill> : st.running ? <Pill tone="ok">Berjalan</Pill> : <Pill tone="warn">Menyambung</Pill>
+      }
+    >
+      <Row
+        label="Aktifkan kendali lewat Telegram"
+        hint={app.telegramTokenSet ? 'Memakai bot yang sama dengan peringatan. Setiap wall butuh bot sendiri.' : 'Isi token bot Telegram di bagian Peringatan panel bermasalah terlebih dahulu.'}
+      >
+        <Switch label="Aktifkan kendali lewat Telegram" checked={t.enabled} onChange={(enabled) => update({ enabled })} />
+      </Row>
+      <Row
+        label="Chat lain yang diizinkan"
+        hint="Chat peringatan sudah otomatis diizinkan. Tambahkan chat ID lain (pisahkan dengan koma), mis. obrolan pribadi Anda dengan bot."
+      >
+        <div className="w-72">
+          <CommitText
+            value={t.allowedChatIds.join(', ')}
+            spellCheck={false}
+            placeholder="mis. 123456789, -1001234567890"
+            onCommit={(v) => update({ allowedChatIds: splitIds(v) }, 'Daftar chat disimpan')}
+          />
+        </div>
+      </Row>
+      <Row label="Hanya pengguna ini (opsional)" hint="Kosongkan agar semua anggota chat yang diizinkan bisa memberi perintah. Berguna untuk membatasi grup.">
+        <div className="w-72">
+          <CommitText
+            value={t.allowedUserIds.join(', ')}
+            spellCheck={false}
+            placeholder="mis. 123456789"
+            onCommit={(v) => update({ allowedUserIds: splitIds(v) }, 'Daftar pengguna disimpan')}
+          />
+        </div>
+      </Row>
+      {t.enabled && st.error && <p className="rounded-md bg-red-500/10 p-2 text-xs text-red-200">{st.error}</p>}
+      {t.enabled && st.running && st.botUsername && (
+        <div className="rounded-md bg-slate-950 p-3 text-xs text-slate-400">
+          Bot aktif sebagai <code className="text-sm text-sky-300">@{st.botUsername}</code>. Kirim <b>/bantuan</b> ke bot untuk daftar perintah.
+          <p className="mt-2">
+            Untuk mengetahui chat ID dan user ID, kirim <b>/id</b> ke bot dari chat mana pun. Perintah dari chat yang belum diizinkan diabaikan dan
+            dicatat di log.
+          </p>
+        </div>
+      )}
+    </Section>
+  )
+}
+
 /** Kendali jarak jauh lewat browser di jaringan lokal. */
 export function RemoteSettings(): React.JSX.Element | null {
   const app = useOperator((s) => s.app)

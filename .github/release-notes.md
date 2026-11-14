@@ -48,4 +48,5 @@ lalu buka seperti biasa (atau klik-kanan → *Open*).
 - Panel web dapat menampilkan beberapa dashboard bergantian dan diberi CSS khusus (sembunyikan header/menu).
 - Operator menampilkan pratinjau langsung setiap panel; banner bisa disimpan sebagai templat, dijadwalkan, dan diberi bunyi alarm.
 - Peringatan otomatis ke webhook/Telegram bila panel bermasalah (Operator › Pengaturan).
+- Kendali wall lewat perintah bot Telegram dari mana saja: /status, /foto, /preset, /banner, /darurat, /muatulang, dan lainnya, dengan tombol interaktif dan daftar chat/pengguna yang diizinkan.
 - Kendali jarak jauh lewat browser (HTTPS) di jaringan lokal (Operator › Pengaturan): preset, banner, navigasi, layar penuh, zoom, ganti URL, dan hapus panel dari ponsel, serta kendali layar dan keyboard panel web seperti remote desktop.

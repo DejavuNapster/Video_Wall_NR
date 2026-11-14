@@ -1,6 +1,6 @@
 import type { SidecarState } from '@shared/types'
 import { useOperator } from '../store'
-import { AlertSettings, RemoteSettings } from './RemoteAlertSettings'
+import { AlertSettings, RemoteSettings, TelegramControlSettings } from './RemoteAlertSettings'
 import { btn, CommitNumber, inputCls, Pill, Row, Section, Switch } from './ui'
 
 const SIDECAR_LABEL: Record<SidecarState, string> = {
@@ -94,6 +94,7 @@ export function SettingsPanel(): React.JSX.Element | null {
       </Section>
 
       <AlertSettings />
+      <TelegramControlSettings />
       <RemoteSettings />
 
       <Section title="Backup & pulihkan" description="Semua preset dan pengaturan dalam satu file. Password kamera tidak ikut (tetap terenkripsi di komputer ini).">

@@ -114,6 +114,15 @@ export interface AppState {
   remote: RemoteStatus
   /** Token bot Telegram untuk peringatan sudah tersimpan (nilainya tidak pernah dikirim ke UI). */
   telegramTokenSet: boolean
+  telegram: TelegramStatus
+}
+
+/** Status kendali lewat bot Telegram. */
+export interface TelegramStatus {
+  running: boolean
+  /** Nama bot (tanpa @) setelah token berhasil diperiksa. */
+  botUsername?: string
+  error?: string
 }
 
 /** Status server kendali jarak jauh. */

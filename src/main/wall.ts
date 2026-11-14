@@ -257,10 +257,15 @@ export class WallController extends EventEmitter {
   async captureTileFrame(tileId: string, maxWidth: number): Promise<{ jpeg: Buffer } | { error: string }> {
     const r = this.screenTile(tileId)
     if ('error' in r) return r
-    const img = await r.tv.view.webContents.capturePage().catch(() => null)
-    if (!img || img.isEmpty()) return { error: 'Gambar panel belum tersedia' }
-    const scaled = img.getSize().width > maxWidth ? img.resize({ width: maxWidth, quality: 'good' }) : img
-    return { jpeg: scaled.toJPEG(70) }
+    const jpeg = await captureJpeg(r.tv, maxWidth, 70)
+    return jpeg ? { jpeg } : { error: 'Gambar panel belum tersedia' }
+  }
+
+  /** Gambar JPEG panel apa pun yang sedang terlihat di wall (cuplikan untuk Telegram); null = tidak tampil. */
+  captureTileImage(tileId: string, maxWidth: number): Promise<Buffer | null> {
+    const tv = this.findTile(tileId)
+    if (!tv || tv.view.webContents.isDestroyed() || !tv.view.getVisible()) return Promise.resolve(null)
+    return captureJpeg(tv, maxWidth, 80)
   }
 
   /** Kirim klik, gulir, atau ketikan dari layar kendali jarak jauh ke panel web. */
@@ -806,4 +811,12 @@ export class WallController extends EventEmitter {
     void appendMetrics(rows)
     this.deps.onChange()
   }
+}
+
+/** Gambar panel sebagai JPEG, diperkecil bila lebih lebar dari `maxWidth` (null = belum ada gambar). */
+async function captureJpeg(tv: TileView, maxWidth: number, quality: number): Promise<Buffer | null> {
+  const img = await tv.view.webContents.capturePage().catch(() => null)
+  if (!img || img.isEmpty()) return null
+  const scaled = img.getSize().width > maxWidth ? img.resize({ width: maxWidth, quality: 'good' }) : img
+  return scaled.toJPEG(quality)
 }

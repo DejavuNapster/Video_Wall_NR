@@ -92,6 +92,7 @@ Pada server tanpa layar: `xvfb-run -a npm run dev -- -- --virtual-displays=4 --n
 | – | `VW_NO_GPU_FLAGS=1` | Jangan aktifkan flag decode GPU |
 | – | `VW_ENABLE_FEATURES=...` | Tambah fitur Chromium |
 | – | `VW_OZONE=x11\|wayland` | Dibaca launcher Linux |
+| – | `VW_TELEGRAM_API=http://…` | Alamat Bot API Telegram lain (hanya untuk pengujian dengan server tiruan) |
 
 Pintasan global: **Ctrl+Alt+O** tampilkan operator, **Ctrl+Alt+W** tampilkan wall di depan, **Ctrl+Alt+Q** keluar.
 
@@ -160,7 +161,7 @@ Dibuka otomatis saat aplikasi mulai (kecuali `--hide-operator`), lewat menu ☰ 
   **dijadwalkan** per jam + hari (mis. pengingat rapat).
 - **Pengaturan**: jalan otomatis saat login, monitor utama untuk Operator, abaikan sertifikat (semua panel),
   pemulihan otomatis (muat ulang berkala, deteksi video beku, batas memori), relay RTSP (MediaMTX),
-  **peringatan panel bermasalah**, **kendali jarak jauh**, dan **backup & pulihkan** (semua preset + pengaturan
+  **peringatan panel bermasalah**, **kendali lewat Telegram**, **kendali jarak jauh**, dan **backup & pulihkan** (semua preset + pengaturan
   dalam satu file JSON; password RTSP, password kendali jarak jauh, dan token Telegram tidak ikut).
 
 ### Peringatan panel bermasalah
@@ -173,7 +174,37 @@ waktu (bawaan 5 menit), aplikasi mengirim pesan ke:
 - **Telegram**: isi chat ID (grup/kanal) dan token bot dari @BotFather; bot harus sudah ada di grup tersebut.
 
 Pesan memuat nama panel, nomor monitor, dan nama komputer. Saat panel pulih, pesan pulih dikirim (bisa
-dimatikan). Gunakan **Kirim pesan uji** untuk memeriksa saluran.
+dimatikan). Gunakan **Kirim pesan uji** untuk memeriksa saluran. Pesan Telegram diformat (tebal, miring, emoji,
+blok kode untuk penyebab galat) dan menyertakan perintah `/muatulang` untuk panel tersebut.
+
+### Kendali lewat Telegram
+
+Kendalikan wall dengan perintah ke bot Telegram dari mana saja. Wall yang menghubungi Telegram (long polling),
+jadi tidak perlu membuka port atau alamat publik. Memakai bot yang sama dengan peringatan; setiap wall butuh bot
+sendiri.
+
+| Perintah | Fungsi |
+| --- | --- |
+| `/status` | Preset aktif, mode, rotasi, banner, dan kondisi setiap panel (panel bermasalah ditandai) |
+| `/foto` · `/foto 2` | Cuplikan semua panel (atau monitor 2) sebagai album foto |
+| `/preset` · `/preset Rapat` · `/preset 2` | Pilih preset lewat tombol, atau langsung berdasarkan nama/nomor |
+| `/berikut` · `/sebelum` | Preset berikutnya / sebelumnya |
+| `/tampil` · `/atur` | Mode Tampil / Mode Atur |
+| `/rotasi nyala` · `/rotasi mati` | Rotasi preset |
+| `/banner teks` | Banner informasi selama 5 menit |
+| `/darurat teks` | Banner darurat dengan alarm, tampil sampai ditutup |
+| `/templat` · `/tutupbanner` | Tampilkan templat banner lewat tombol · tutup banner |
+| `/muatulang` · `/muatulang 2` · `/muatulang 2.3` | Muat ulang semua panel · monitor 2 · panel 3 di monitor 2 |
+| `/id` | Chat ID dan user ID pengirim (untuk mengatur izin) |
+| `/bantuan` | Daftar perintah |
+
+Balasan berisi tombol (mis. ◀️ Sebelum · 🔄 Segarkan · Berikut ▶️ di bawah `/status`), dan perintah muncul di menu
+"/" Telegram.
+
+1. Isi token bot di bagian **Peringatan panel bermasalah**.
+2. Operator › Pengaturan › **Kendali lewat Telegram**: aktifkan. Chat peringatan otomatis diizinkan; tambahkan chat
+   lain (mis. obrolan pribadi dengan bot) di **Chat lain yang diizinkan**. Kirim `/id` ke bot untuk mengetahui ID-nya.
+3. Opsional: isi **Hanya pengguna ini** agar di grup hanya orang tertentu yang bisa memberi perintah.
 
 ### Kendali jarak jauh
 
@@ -299,6 +330,10 @@ Data dari nama lama (`Video Wall Browser`) dipindahkan otomatis saat versi baru 
   "Proceed anyway" di Chrome, mis. untuk server yang diakses lewat IP). Panel dengan opsi ini memakai session
   terpisah (`persist:tile-<id>-insecure`), sehingga login perlu diulang sekali setelah opsi diubah.
 - Password RTSP dan token bot Telegram disimpan terenkripsi (safeStorage), tidak ada di berkas preset/ekspor.
+- Kendali lewat Telegram: mati secara bawaan; perintah hanya diterima dari chat yang diizinkan (chat peringatan +
+  daftar tambahan) dan, bila diisi, hanya dari user ID tertentu. Perintah dari chat lain diabaikan tanpa balasan
+  (kecuali `/id`) dan dicatat di log; perintah yang menumpuk saat wall mati tidak dijalankan. Semua teks dari luar
+  di-escape untuk MarkdownV2; bila Telegram menolak format, pesan dikirim ulang sebagai teks biasa.
 - Kendali jarak jauh: mati secara bawaan; hanya HTTPS (TLS 1.2+) dengan sertifikat self-signed (kunci EC P-256,
   berlaku 825 hari) yang dibuat otomatis untuk nama komputer dan semua IP jaringan lokal, disimpan terenkripsi
   (safeStorage), dan dibuat ulang bila IP berubah atau masa berlakunya tinggal 30 hari. Permintaan HTTP biasa di

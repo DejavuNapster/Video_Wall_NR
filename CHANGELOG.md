@@ -4,6 +4,38 @@ Semua perubahan penting pada Video Wall NR dicatat di berkas ini, versi terbaru 
 setiap versi juga ditampilkan di halaman [Releases](https://github.com/DejavuNapster/Video_Wall_NR/releases).
 Versi 0.2.3 dan 0.2.4 hanya dicatat di sini dan tidak tersedia untuk diunduh.
 
+## [0.2.9] - 2026-11-15
+
+### Ditambahkan
+
+- **Kendali wall lewat perintah bot Telegram**, dari mana saja dan tanpa membuka port (wall yang menghubungi
+  Telegram). Memakai bot yang sama dengan peringatan:
+  - `/status` — preset aktif, mode, rotasi, banner, dan kondisi setiap panel dengan nomor panel (mis. `1.2`);
+    panel bermasalah ditandai beserta penyebabnya;
+  - `/foto` — cuplikan semua panel (atau satu monitor) sebagai album foto;
+  - `/preset`, `/berikut`, `/sebelum` — ganti preset lewat tombol, nama, atau nomor;
+  - `/tampil`, `/atur`, `/rotasi` — Mode Tampil/Atur dan rotasi preset;
+  - `/banner`, `/darurat`, `/templat`, `/tutupbanner` — banner informasi, banner darurat dengan alarm, templat;
+  - `/muatulang` — semua panel, satu monitor, atau satu panel;
+  - `/id` dan `/bantuan`.
+- Tombol interaktif di bawah balasan (mis. ◀️ Sebelum · 🔄 Segarkan · Berikut ▶️ · 📸 Foto panel) dan menu "/"
+  perintah di Telegram.
+- Bagian **Kendali lewat Telegram** di Operator › Pengaturan: sakelar (mati secara bawaan), daftar chat tambahan
+  yang diizinkan, dan daftar pengguna yang diizinkan (opsional, untuk membatasi grup), serta status bot.
+
+### Diubah
+
+- **Pesan Telegram kini rapi dan terstruktur**: judul tebal, keterangan miring, emoji, dan blok kode (MarkdownV2).
+  Berlaku juga untuk peringatan panel bermasalah, pesan pulih, dan pesan uji. Peringatan kini menyertakan nomor
+  panel dan perintah `/muatulang` untuk panel tersebut. Bila Telegram menolak format, pesan dikirim ulang sebagai
+  teks biasa sehingga tidak pernah hilang. Pesan webhook tetap teks biasa.
+
+### Keamanan
+
+- Perintah hanya diterima dari chat yang diizinkan (dan pengguna tertentu bila diisi); perintah dari chat lain
+  diabaikan tanpa balasan dan dicatat di log. Perintah yang terkirim saat wall mati tidak dijalankan ketika aplikasi
+  menyala lagi.
+
 ## [0.2.8] - 2026-11-14
 
 ### Ditambahkan

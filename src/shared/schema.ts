@@ -156,6 +156,27 @@ export const RemoteSettingsSchema = z.object({
 export const RemoteSettingsPatchSchema = z.object(remoteFields).partial().strict()
 
 /**
+ * Kendali wall lewat perintah bot Telegram (token bot sama dengan peringatan, terenkripsi di vault).
+ * - `allowedChatIds` : chat lain selain chat peringatan yang boleh memberi perintah.
+ * - `allowedUserIds` : bila diisi, hanya pengguna ini yang dilayani (berguna di grup).
+ */
+const telegramFields = {
+  enabled: z.boolean(),
+  allowedChatIds: z
+    .array(z.string().trim().regex(/^(-?\d{1,20}|@[A-Za-z0-9_]{5,64})$/, 'Chat ID Telegram berupa angka (mis. -1001234567890) atau @namagrup'))
+    .max(20),
+  allowedUserIds: z.array(z.string().trim().regex(/^\d{1,20}$/, 'User ID Telegram berupa angka (mis. 123456789)')).max(50)
+}
+export const TELEGRAM_CONTROL_DEFAULT = { enabled: false, allowedChatIds: [] as string[], allowedUserIds: [] as string[] }
+export const TelegramControlSchema = z.object({
+  enabled: telegramFields.enabled.default(TELEGRAM_CONTROL_DEFAULT.enabled),
+  allowedChatIds: telegramFields.allowedChatIds.default([]),
+  allowedUserIds: telegramFields.allowedUserIds.default([])
+})
+/** Patch tanpa nilai bawaan (lihat AlertSettingsPatchSchema). */
+export const TelegramControlPatchSchema = z.object(telegramFields).partial().strict()
+
+/**
  * Entri jadwal preset berbasis jam.
  * - `presetId`  : preset yang diaktifkan pada jam ini.
  * - `hour`/`minute` : jam lokal (00:00–23:59).
@@ -295,5 +316,6 @@ export const SettingsSchema = z.object({
   bannerTemplates: z.array(BannerTemplateSchema).max(50).default([]),
   bannerSchedule: z.array(BannerScheduleEntrySchema).max(48).default([]),
   alerts: AlertSettingsSchema.default(ALERT_SETTINGS_DEFAULT),
-  remote: RemoteSettingsSchema.default(REMOTE_SETTINGS_DEFAULT)
+  remote: RemoteSettingsSchema.default(REMOTE_SETTINGS_DEFAULT),
+  telegram: TelegramControlSchema.default(TELEGRAM_CONTROL_DEFAULT)
 })

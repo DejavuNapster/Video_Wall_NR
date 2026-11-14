@@ -3,6 +3,8 @@ import { app } from 'electron'
 import { ALERT_CHECK_MS, type AlertEvent, type AlertTrack, evaluateAlerts, formatDuration } from '@shared/alerts'
 import type { AlertSettings, Result, TileStatus } from '@shared/types'
 import { createLogger } from './logger'
+import { TelegramApi } from './telegram/api'
+import { alertMessage, type PanelInfo, testMessage } from './telegram/alertMessages'
 
 const log = createLogger('peringatan')
 const SEND_TIMEOUT_MS = 10_000
@@ -10,8 +12,8 @@ const SEND_TIMEOUT_MS = 10_000
 export interface AlertDeps {
   settings: () => AlertSettings
   statuses: () => Record<string, TileStatus>
-  /** Nama panel yang mudah dikenali (label atau host URL) + nomor monitor. */
-  describe: (tileId: string) => string
+  /** Nama panel yang mudah dikenali (label atau host URL), nomor monitor, dan nomor panel seperti di /status. */
+  describe: (tileId: string) => PanelInfo
   /** Token bot Telegram dari vault (null = belum diisi). */
   telegramToken: () => Promise<string | null>
 }
@@ -58,8 +60,10 @@ export class AlertMonitor {
     return this.send(`✅ Uji peringatan dari Video Wall NR di komputer "${hostname()}". Saluran ini siap menerima peringatan.`)
   }
 
+  /** Teks biasa untuk webhook (Slack, Discord, dll.); Telegram memakai versi berformat dari alertMessage(). */
   private message(ev: AlertEvent): string {
-    const where = `${this.d.describe(ev.tileId)} di komputer "${hostname()}"`
+    const p = this.d.describe(ev.tileId)
+    const where = `"${p.name}"${p.monitor !== null ? ` (monitor ${p.monitor})` : ''} di komputer "${hostname()}"`
     if (ev.kind === 'up') return `✅ Panel pulih: ${where} kembali normal setelah bermasalah ${formatDuration(ev.durationMs)}.`
     return `⚠️ Panel bermasalah: ${where} tidak tampil normal selama ${formatDuration(ev.durationMs)}.${ev.error ? `\nPenyebab: ${ev.error}` : ''}`
   }
@@ -80,10 +84,12 @@ export class AlertMonitor {
       jobs.push(post(s.webhookUrl, body).then((err) => (err ? `Webhook: ${err}` : null)))
     }
     if (s.telegramChatId && token) {
+      const formatted = ev ? alertMessage(ev, this.d.describe(ev.tileId), hostname()) : testMessage(hostname())
       jobs.push(
-        post(`https://api.telegram.org/bot${token}/sendMessage`, { chat_id: s.telegramChatId, text }).then((err) =>
-          err ? `Telegram: ${err}` : null
-        )
+        new TelegramApi(token)
+          .sendMessage(s.telegramChatId, formatted)
+          .then(() => null)
+          .catch((err: unknown) => `Telegram: ${err instanceof Error ? err.message : String(err)}`)
       )
     }
     if (jobs.length === 0) return { ok: false, error: 'Belum ada saluran: isi URL webhook, atau chat ID + token bot Telegram' }
