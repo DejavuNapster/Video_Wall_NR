@@ -28,6 +28,7 @@ import { appendMetrics, type MetricsRow } from './metrics'
 import { type MediaMtxSidecar, mediaPathName, type PathSpec, withCredentials } from './sidecar'
 import { TileView, type TileContext } from './tiles'
 import type { MonitorView } from './remote/control'
+import { type ScreenInput, toInputSteps } from './remote/screen'
 import { WallUiView } from './wallUi'
 
 const log = createLogger('wall')
@@ -242,6 +243,40 @@ export class WallController extends EventEmitter {
   stepTilePage(slot: number, tileId: string, dir: 1 | -1): Result {
     const tv = this.windows.get(slot)?.tiles.get(tileId)
     return tv?.stepPage(dir) ? { ok: true } : { ok: false, error: 'Panel ini tidak memakai rotasi halaman' }
+  }
+
+  /** Panel web yang sedang tampil di wall (untuk layar kendali jarak jauh). */
+  private screenTile(tileId: string): { tv: TileView } | { error: string } {
+    const tv = this.findTile(tileId)
+    if (!tv || tv.tile.source.type !== 'web') return { error: 'Kendali layar hanya untuk panel halaman web' }
+    if (tv.view.webContents.isDestroyed() || !tv.view.getVisible()) return { error: 'Panel sedang tidak tampil di wall' }
+    return { tv }
+  }
+
+  /** Gambar JPEG isi panel web untuk layar kendali jarak jauh (lebar maksimal `maxWidth` px). */
+  async captureTileFrame(tileId: string, maxWidth: number): Promise<{ jpeg: Buffer } | { error: string }> {
+    const r = this.screenTile(tileId)
+    if ('error' in r) return r
+    const img = await r.tv.view.webContents.capturePage().catch(() => null)
+    if (!img || img.isEmpty()) return { error: 'Gambar panel belum tersedia' }
+    const scaled = img.getSize().width > maxWidth ? img.resize({ width: maxWidth, quality: 'good' }) : img
+    return { jpeg: scaled.toJPEG(70) }
+  }
+
+  /** Kirim klik, gulir, atau ketikan dari layar kendali jarak jauh ke panel web. */
+  sendTileInput(tileId: string, input: ScreenInput): Result {
+    const r = this.screenTile(tileId)
+    if ('error' in r) return { ok: false, error: r.error }
+    const wc = r.tv.view.webContents
+    const { width, height } = r.tv.view.getBounds()
+    if (width < 2 || height < 2) return { ok: false, error: 'Panel sedang tidak tampil di wall' }
+    // Keyboard hanya diterima halaman yang memegang fokus; klik juga menjadikan panel ini panel aktif.
+    if (!wc.isFocused()) wc.focus()
+    for (const step of toInputSteps(input, width, height)) {
+      if ('insertText' in step) void wc.insertText(step.insertText)
+      else wc.sendInputEvent(step.event)
+    }
+    return { ok: true }
   }
 
   // ---------------------------------------------------------------- API untuk UI wall (per monitor)

@@ -1,7 +1,34 @@
 # Catatan Perubahan
 
-Semua perubahan penting pada Video Wall NR dicatat di berkas ini, versi terbaru di atas. Bagian setiap versi
-juga ditampilkan di halaman [Releases](https://github.com/DejavuNapster/Video_Wall_NR/releases).
+Semua perubahan penting pada Video Wall NR dicatat di berkas ini, versi terbaru di atas. Mulai v0.2.5, bagian
+setiap versi juga ditampilkan di halaman [Releases](https://github.com/DejavuNapster/Video_Wall_NR/releases).
+Versi 0.2.3 dan 0.2.4 hanya dicatat di sini dan tidak tersedia untuk diunduh.
+
+## [0.2.8] - 2026-11-14
+
+### Ditambahkan
+
+- **Kendali layar panel web dari ponsel**, seperti remote desktop. Tombol **🖱 Kendalikan layar** di kendali panel
+  menampilkan isi panel secara langsung (diperbarui terus-menerus) dan meneruskan sentuhan ke panel:
+  - ketuk = klik, ketuk dua kali = klik ganda, geser = gulir; tombol **Geser** mengganti fungsi geser menjadi
+    seret (mis. untuk peta atau slider); roda mouse juga bisa dipakai dari komputer lain;
+  - kolom **Ketik** mengirim teks ke kolom yang sedang aktif di panel, dengan tombol Enter, Backspace, Tab, Esc,
+    dan panah.
+- Sakelar **Izinkan kendali layar dan keyboard panel** di Operator › Pengaturan › Kendali jarak jauh. Sakelar ini
+  mati secara bawaan; selama mati, kendali layar ditolak oleh server.
+- **Hapus panel** dari halaman kendali, dengan ketukan kedua sebagai konfirmasi agar tidak terhapus karena salah
+  sentuh.
+
+### Diubah
+
+- **Kendali jarak jauh kini memakai HTTPS.** Sertifikat dibuat otomatis oleh komputer wall untuk nama komputer dan
+  semua alamat IP jaringan lokalnya, disimpan terenkripsi, berlaku 825 hari, dan dibuat ulang otomatis bila IP
+  berubah atau masa berlakunya hampir habis. Password dan semua perintah kini terkirim terenkripsi.
+- Alamat `http://` lama otomatis dialihkan ke `https://` di port yang sama; login dan perintah lewat HTTP biasa
+  ditolak.
+- Operator menampilkan sidik jari SHA-256 sertifikat untuk dicocokkan di browser ponsel, beserta tanggal berlaku
+  sertifikat.
+- Cookie sesi kendali jarak jauh kini bertanda `Secure`.
 
 ## [0.2.7] - 2026-11-14
 
@@ -68,10 +95,14 @@ juga ditampilkan di halaman [Releases](https://github.com/DejavuNapster/Video_Wa
 
 ## [0.2.4] - 2026-11-14
 
+Versi pertama yang dibangun lewat GitHub Actions. Rilisnya masih memakai nama lama (Video Wall Browser) sehingga
+telah dihapus dari halaman Releases; perubahan versi ini sudah termasuk dalam v0.2.5.
+
 ### Ditambahkan
 
-- **Rilis resmi pertama di GitHub** dengan build otomatis untuk Windows (installer dan portable), Linux (`.deb`
-  dan AppImage), serta macOS Intel dan Apple Silicon (`.dmg` dan `.zip`), lengkap dengan `SHA256SUMS.txt`.
+- **Build otomatis dengan GitHub Actions** untuk Windows (installer dan portable), Linux (`.deb` dan AppImage),
+  serta macOS Intel dan Apple Silicon (`.dmg` dan `.zip`), lengkap dengan `SHA256SUMS.txt`, yang diterbitkan ke
+  halaman Releases setiap kali tag versi baru di-push.
 - Kolom **Judul** pada banner. Kolom ini terisi otomatis dari tema, dapat diubah sendiri (misalnya "Rapat
   Umum"), dan dapat dikosongkan agar banner hanya menampilkan teks utama.
 
@@ -87,6 +118,9 @@ juga ditampilkan di halaman [Releases](https://github.com/DejavuNapster/Video_Wa
 - Tema Peringatan, Info, dan Netral tidak lagi menampilkan judul "Pengumuman Darurat".
 
 ## [0.2.3] - 2026-11-14
+
+Versi ini dibuat sebelum kode diunggah ke GitHub sehingga tidak memiliki rilis; perubahannya sudah termasuk dalam
+v0.2.5.
 
 ### Ditambahkan
 

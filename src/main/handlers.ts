@@ -47,6 +47,8 @@ export interface HandlerDeps {
 
 /** Kunci rahasia aplikasi di CredentialVault (berdampingan dengan password RTSP per panel). */
 export const VAULT_REMOTE_PASSWORD = 'remote-password'
+/** Sertifikat HTTPS kendali jarak jauh (JSON { cert, key }, PEM). */
+export const VAULT_REMOTE_TLS = 'remote-tls'
 export const VAULT_TELEGRAM_TOKEN = 'alert-telegram-token'
 
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error })

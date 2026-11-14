@@ -177,21 +177,30 @@ dimatikan). Gunakan **Kirim pesan uji** untuk memeriksa saluran.
 
 ### Kendali jarak jauh
 
-Operasikan wall dari ponsel atau komputer lain di jaringan yang sama melalui browser:
+Operasikan wall dari ponsel atau komputer lain di jaringan yang sama melalui browser (HTTPS):
 
 - **Tampilan & preset:** Mode Tampil / Mode Atur, rotasi preset, pilih preset, atau preset sebelumnya/berikutnya (◀ ▶).
 - **Banner:** tampilkan templat banner atau banner cepat, tutup banner.
 - **Per monitor:** tampilkan wall di depan aplikasi lain, layar penuh jendela wall, muat ulang semua panel,
   keluar dari layar penuh panel.
 - **Per panel** (ketuk pratinjau panel): ← kembali, → maju, ⌂ ke URL panel, ⟳ muat ulang, ⛶ layar penuh panel,
-  ⧉ buka di panel baru, zoom (− / + / 100%), halaman rotasi sebelumnya/berikutnya, dan ganti URL panel (juga
-  untuk mengisi panel kosong dengan URL halaman web atau alamat kamera).
+  ⧉ buka di panel baru, zoom (− / + / 100%), halaman rotasi sebelumnya/berikutnya, ganti URL panel (juga
+  untuk mengisi panel kosong dengan URL halaman web atau alamat kamera), dan 🗑 hapus panel (ketuk dua kali).
+- **Kendali layar panel web** (🖱 Kendalikan layar): isi panel tampil langsung di ponsel dan bisa dioperasikan
+  seperti remote desktop. Ketuk = klik, ketuk dua kali = klik ganda, geser = gulir (atau seret, lewat tombol
+  *Geser*), roda mouse untuk menggulir dari komputer lain, kolom **Ketik** untuk mengirim teks ke kolom yang sedang
+  aktif, serta tombol Enter, Backspace, Tab, Esc, dan panah. Fitur ini mati secara bawaan; aktifkan dengan
+  **Izinkan kendali layar dan keyboard panel** di Operator.
 
 Setiap panel menampilkan pratinjau langsung, status, dan alamat halaman yang sedang terbuka.
 
 1. Operator › Pengaturan › **Kendali jarak jauh**: atur password (minimal 8 karakter), lalu aktifkan.
-2. Buka alamat yang ditampilkan (mis. `http://192.168.1.20:8787`) dari perangkat lain dan masuk dengan password.
-3. Saat pertama kali diaktifkan, Windows meminta izin firewall: pilih **Private networks**.
+2. Buka alamat yang ditampilkan (mis. `https://192.168.1.20:8787`) dari perangkat lain dan masuk dengan password.
+   Alamat `http://` lama otomatis dialihkan ke `https://`.
+3. Sertifikat HTTPS dibuat oleh komputer ini, jadi saat pertama kali dibuka browser memperingatkan bahwa koneksi
+   tidak bersifat pribadi: pilih **Lanjutkan** / **Kunjungi situs web ini**. Untuk memastikan yang terbuka benar-benar
+   wall Anda, cocokkan sidik jari SHA-256 di detail sertifikat browser dengan yang tertera di Operator.
+4. Saat pertama kali diaktifkan, Windows meminta izin firewall: pilih **Private networks**.
 
 | Shortcut (di jendela wall) | Fungsi |
 | --- | --- |
@@ -232,12 +241,13 @@ npm run dist:mac
 
 **Rilis otomatis** — `.github/workflows/release.yml` membangun ketiga OS di runner GitHub Actions
 (`windows-latest`, `ubuntu-latest`, `macos-latest`), lalu menerbitkan semua installer + `SHA256SUMS.txt` ke
-halaman Releases. Catatan rilis diambil dari `.github/release-notes.md`.
+halaman Releases. Isi halaman rilis adalah bagian versi tersebut dari `CHANGELOG.md`, diikuti petunjuk unduh dari
+`.github/release-notes.md`; build gagal bila `CHANGELOG.md` belum memuat versi yang dirilis.
 
 ```bash
-# naikkan "version" di package.json, commit, lalu:
-git tag v0.2.4
-git push origin main v0.2.4
+# naikkan "version" di package.json, tambahkan bagian versi di CHANGELOG.md, commit, lalu:
+git tag v0.2.8
+git push origin main v0.2.8
 ```
 
 Ikon Windows memakai `build/icon.ico` yang sudah jadi; Linux/macOS memakai `build/icon.png` (512×512).
@@ -289,11 +299,15 @@ Data dari nama lama (`Video Wall Browser`) dipindahkan otomatis saat versi baru 
   "Proceed anyway" di Chrome, mis. untuk server yang diakses lewat IP). Panel dengan opsi ini memakai session
   terpisah (`persist:tile-<id>-insecure`), sehingga login perlu diulang sekali setelah opsi diubah.
 - Password RTSP dan token bot Telegram disimpan terenkripsi (safeStorage), tidak ada di berkas preset/ekspor.
-- Kendali jarak jauh: mati secara bawaan; password disimpan sebagai hash scrypt (terenkripsi safeStorage); sesi
-  lewat cookie `HttpOnly` + `SameSite=Strict` (berlaku 12 jam, hilang saat password diganti atau aplikasi
-  ditutup); setiap `POST` wajib membawa header khusus (perlindungan CSRF); login dikunci 60 detik setelah 5 kali
-  gagal; CSP ketat dan semua masukan divalidasi zod. Koneksi berupa HTTP biasa (tidak terenkripsi), jadi
-  gunakan hanya di jaringan lokal tepercaya.
+- Kendali jarak jauh: mati secara bawaan; hanya HTTPS (TLS 1.2+) dengan sertifikat self-signed (kunci EC P-256,
+  berlaku 825 hari) yang dibuat otomatis untuk nama komputer dan semua IP jaringan lokal, disimpan terenkripsi
+  (safeStorage), dan dibuat ulang bila IP berubah atau masa berlakunya tinggal 30 hari. Permintaan HTTP biasa di
+  port yang sama dialihkan ke HTTPS, dan API (termasuk login) tidak dilayani lewat HTTP. HSTS sengaja tidak
+  dipasang karena membuat browser menolak sertifikat self-signed sama sekali. Password disimpan sebagai hash
+  scrypt (terenkripsi safeStorage); sesi lewat cookie `HttpOnly` + `Secure` + `SameSite=Strict` (berlaku 12 jam,
+  hilang saat password diganti atau aplikasi ditutup); setiap `POST` wajib membawa header khusus (perlindungan
+  CSRF); login dikunci 60 detik setelah 5 kali gagal; CSP ketat dan semua masukan divalidasi zod. Kendali layar
+  dan keyboard panel punya sakelar izin sendiri (mati secara bawaan) dan hanya berlaku untuk panel web.
 - CSS khusus panel hanya mengubah tampilan halaman di panel itu (disuntikkan lewat `insertCSS`, tanpa JavaScript).
 - MediaMTX: hanya `127.0.0.1`, akses anonim hanya `read`, API memakai token acak per sesi.
 - CSP disuntikkan pada build produksi (varian operator — juga dipakai UI wall — dan video).

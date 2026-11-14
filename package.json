@@ -1,7 +1,7 @@
 {
   "name": "video-wall-browser",
   "productName": "Video Wall NR",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Video Wall NR - video wall multi-monitor (web + video) untuk Windows, Linux, dan macOS",
   "main": "./out/main/index.js",
   "author": {
@@ -30,6 +30,7 @@
     "postinstall": "node node_modules/electron/install.js"
   },
   "dependencies": {
+    "selfsigned": "^5.5.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

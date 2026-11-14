@@ -1,4 +1,5 @@
 import type { Result, TileNavAction } from '@shared/types'
+import type { ScreenInput } from './screen'
 
 /** Aksi panel dari kendali jarak jauh (setara tombol bilah panel + shortcut di wall). */
 export const TILE_ACTIONS = [
@@ -12,7 +13,8 @@ export const TILE_ACTIONS = [
   'zoomOut',
   'zoomReset',
   'prevPage',
-  'nextPage'
+  'nextPage',
+  'remove'
 ] as const
 export type RemoteTileAction = (typeof TILE_ACTIONS)[number]
 
@@ -39,6 +41,8 @@ export interface WallControlTarget {
   stepTilePage(slot: number, tileId: string, dir: 1 | -1): Result
   reloadAllInSlot(slot: number): Result
   showWalls(focus?: boolean): void
+  captureTileFrame(tileId: string, maxWidth: number): Promise<{ jpeg: Buffer } | { error: string }>
+  sendTileInput(tileId: string, input: ScreenInput): Result
 }
 
 export interface WallControlDeps {
@@ -46,6 +50,7 @@ export interface WallControlDeps {
   zoomTile(slot: number, tileId: string, dir: 'in' | 'out' | 'reset'): Promise<Result>
   /** Ganti URL/sumber panel (deteksi jenis sama seperti kolom URL di wall). */
   setSource(slot: number, tileId: string, input: string): Promise<Result>
+  removeTile(slot: number, tileId: string): Promise<Result>
   presetIds(): string[]
   activeId(): string | null
   activatePreset(id: string): Promise<Result>
@@ -87,7 +92,21 @@ export class WallRemoteControl {
         return wall.stepTilePage(slot, tileId, -1)
       case 'nextPage':
         return wall.stepTilePage(slot, tileId, 1)
+      case 'remove':
+        return this.d.removeTile(slot, tileId)
     }
+  }
+
+  /** Gambar terbaru panel web untuk layar kendali. */
+  screenFrame(tileId: string, maxWidth: number): Promise<{ jpeg: Buffer } | { error: string }> {
+    if (this.d.wall.slotOfTile(tileId) === null) return Promise.resolve({ error: NOT_ON_WALL.error })
+    return this.d.wall.captureTileFrame(tileId, maxWidth)
+  }
+
+  /** Klik, gulir, atau ketikan dari layar kendali ke panel web. */
+  screenInput(tileId: string, input: ScreenInput): Result {
+    if (this.d.wall.slotOfTile(tileId) === null) return NOT_ON_WALL
+    return this.d.wall.sendTileInput(tileId, input)
   }
 
   async setUrl(tileId: string, url: string): Promise<Result> {

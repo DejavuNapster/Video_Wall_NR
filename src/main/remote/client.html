@@ -84,6 +84,36 @@
       </section>
     </main>
 
+    <div id="screen" class="screen" role="dialog" aria-modal="true" aria-labelledby="screen-title" hidden>
+      <header class="screen-top">
+        <strong id="screen-title"></strong>
+        <button id="screen-close" type="button" class="ghost">Tutup</button>
+      </header>
+      <div class="screen-view">
+        <img id="screen-img" alt="Layar panel" draggable="false" />
+        <p id="screen-status" class="muted small" role="status"></p>
+      </div>
+      <div class="screen-tools">
+        <div class="row compact keys">
+          <button id="screen-mode" type="button" title="Ganti fungsi geseran jari">Geser: gulir</button>
+          <button type="button" data-key="Escape">Esc</button>
+          <button type="button" data-key="Tab">Tab</button>
+          <button type="button" data-key="Backspace" aria-label="Hapus (Backspace)">&#9003;</button>
+          <button type="button" data-key="Enter" aria-label="Enter">&#9166;</button>
+          <button type="button" data-key="Left" aria-label="Panah kiri">&#8592;</button>
+          <button type="button" data-key="Up" aria-label="Panah atas">&#8593;</button>
+          <button type="button" data-key="Down" aria-label="Panah bawah">&#8595;</button>
+          <button type="button" data-key="Right" aria-label="Panah kanan">&#8594;</button>
+        </div>
+        <form id="screen-type" class="row type">
+          <input id="screen-text" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="1000" placeholder="Ketik teks untuk panel…" aria-label="Teks untuk panel" />
+          <button type="submit" class="primary">Kirim</button>
+          <button id="screen-send-enter" type="button" title="Kirim teks lalu tekan Enter">Kirim + &#9166;</button>
+        </form>
+        <p class="muted small">Ketuk = klik, ketuk dua kali = klik ganda, geser = gulir (atau seret, sesuai tombol Geser). Teks masuk ke kolom yang sedang aktif di panel.</p>
+      </div>
+    </div>
+
     <div id="toast" class="toast" role="status" hidden></div>
     <script src="/remote.js"></script>
   </body>

@@ -111,7 +111,7 @@ export function RemoteSettings(): React.JSX.Element | null {
   return (
     <Section
       title="Kendali jarak jauh"
-      description="Operasikan wall dari ponsel atau komputer lain di jaringan yang sama: ganti preset, Mode Tampil, banner, pratinjau, dan muat ulang panel."
+      description="Operasikan wall dari ponsel atau komputer lain di jaringan yang sama lewat HTTPS: preset, banner, monitor, navigasi dan hapus panel, serta kendali layar panel."
       actions={st.running ? <Pill tone="ok">Berjalan</Pill> : st.error ? <Pill tone="error">Gagal</Pill> : <Pill tone="muted">Mati</Pill>}
     >
       <Row label="Aktifkan kendali jarak jauh" hint={st.passwordSet ? undefined : 'Atur password terlebih dahulu.'}>
@@ -128,7 +128,14 @@ export function RemoteSettings(): React.JSX.Element | null {
       <Row label="Port" hint="Bila diganti, server dimulai ulang di port baru.">
         <CommitNumber aria-label="Port" value={r.port} min={1024} max={65535} onCommit={(port) => update({ port })} />
       </Row>
+      <Row
+        label="Izinkan kendali layar dan keyboard panel"
+        hint="Perangkat yang masuk dapat melihat isi panel web dan mengklik, menggulir, serta mengetik di dalamnya, termasuk di halaman yang sudah login."
+      >
+        <Switch label="Izinkan kendali layar dan keyboard panel" checked={r.screenControl} onChange={(screenControl) => update({ screenControl })} />
+      </Row>
       {st.error && <p className="rounded-md bg-red-500/10 p-2 text-xs text-red-200">{st.error}</p>}
+      {st.warning && <p className="rounded-md bg-amber-500/10 p-2 text-xs text-amber-200">{st.warning}</p>}
       {st.running && (
         <div className="rounded-md bg-slate-950 p-3 text-xs text-slate-400">
           Buka salah satu alamat ini dari perangkat di jaringan yang sama:
@@ -144,8 +151,21 @@ export function RemoteSettings(): React.JSX.Element | null {
             {st.urls.length === 0 && <li>Komputer ini belum terhubung ke jaringan.</li>}
           </ul>
           <p className="mt-2">
-            Saat pertama kali diaktifkan, Windows mungkin meminta izin firewall: pilih <b>Private networks</b>. Koneksi tidak
-            terenkripsi (HTTP), jadi gunakan hanya di jaringan kantor yang tepercaya.
+            Koneksi terenkripsi (HTTPS) dengan sertifikat yang dibuat komputer ini. Saat pertama kali dibuka, browser
+            memperingatkan bahwa koneksi tidak bersifat pribadi; pilih <b>Lanjutkan</b> / <b>Kunjungi situs web ini</b>. Untuk
+            memastikan yang terbuka benar-benar wall ini, cocokkan sidik jari SHA-256 di detail sertifikat browser:
+          </p>
+          {st.fingerprint && (
+            <div className="mt-1.5 flex items-start gap-2">
+              <code className="break-all text-[11px] text-slate-300">{st.fingerprint}</code>
+              <button className={`${btn.ghost} shrink-0 px-2 py-0.5 text-[11px]`} onClick={() => void navigator.clipboard?.writeText(st.fingerprint ?? '')}>
+                Salin
+              </button>
+            </div>
+          )}
+          {st.certValidTo && <p className="mt-1">Sertifikat berlaku sampai {new Date(st.certValidTo).toLocaleDateString('id-ID')} dan diperbarui otomatis.</p>}
+          <p className="mt-2">
+            Saat pertama kali diaktifkan, Windows mungkin meminta izin firewall: pilih <b>Private networks</b>.
           </p>
         </div>
       )}

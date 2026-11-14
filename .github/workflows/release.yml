@@ -1,6 +1,6 @@
 # Build installer Windows, Linux (.deb + AppImage), dan macOS (.dmg + .zip, Intel + Apple Silicon)
 # di runner asli masing-masing OS, lalu terbitkan ke halaman Releases saat tag v* di-push.
-#   git tag v0.2.4 && git push origin v0.2.4
+#   git tag v0.2.8 && git push origin v0.2.8
 # Jalankan manual (Actions → Release → Run workflow) untuk build tanpa membuat rilis.
 name: Release
 

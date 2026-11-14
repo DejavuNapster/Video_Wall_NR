@@ -13,12 +13,13 @@ import { BannerScheduler } from './bannerSchedule'
 import { dataPath, detectPlatform, flags } from './config'
 import { CredentialVault } from './credentials'
 import { DisplayManager } from './displays'
-import { registerHandlers, VAULT_REMOTE_PASSWORD, VAULT_TELEGRAM_TOKEN } from './handlers'
+import { registerHandlers, VAULT_REMOTE_PASSWORD, VAULT_REMOTE_TLS, VAULT_TELEGRAM_TOKEN } from './handlers'
 import { createLogger } from './logger'
 import { migrateLegacyUserData } from './migrate'
 import { createOperatorWindow, forceCloseOperator } from './operator'
 import { WallRemoteControl } from './remote/control'
 import { RemoteServer } from './remote/server'
+import { TlsStore } from './remote/tls'
 import { RotationController } from './rotation'
 import { ScheduleController } from './schedule'
 import { MediaMtxSidecar } from './sidecar'
@@ -233,6 +234,15 @@ async function bootstrap(): Promise<void> {
   remote = new RemoteServer({
     settings: () => settings.get().remote,
     passwordHash: () => vault.get(VAULT_REMOTE_PASSWORD),
+    // Sertifikat + kunci privat HTTPS disimpan terenkripsi di vault, sama seperti password kamera.
+    tls: new TlsStore({
+      load: async () => {
+        const raw = await vault.get(VAULT_REMOTE_TLS)
+        const v = raw ? (JSON.parse(raw) as { cert?: unknown; key?: unknown }) : null
+        return v && typeof v.cert === 'string' && typeof v.key === 'string' ? { cert: v.cert, key: v.key } : null
+      },
+      save: async (m) => void (await vault.set(VAULT_REMOTE_TLS, JSON.stringify(m)))
+    }),
     state: () => hubRef.build(),
     thumbnails: () => wall.captureThumbnails(),
     activatePreset: (id) => svc.activate(id),
@@ -244,6 +254,7 @@ async function bootstrap(): Promise<void> {
       wall,
       zoomTile,
       setSource: (slot, tileId, input) => svc.edit(slot, { op: 'setSource', tileId, input }),
+      removeTile: (slot, tileId) => svc.edit(slot, { op: 'removeTile', tileId }),
       presetIds: () => hub?.presetList.map((p) => p.id) ?? [],
       activeId: () => svc.activeId,
       activatePreset: (id) => svc.activate(id)

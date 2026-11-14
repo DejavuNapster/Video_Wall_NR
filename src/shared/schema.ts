@@ -142,12 +142,15 @@ export const AlertSettingsPatchSchema = z.object(alertFields).partial().strict()
 /** Kendali jarak jauh lewat browser di jaringan lokal. Password disimpan sebagai hash di vault, bukan di sini. */
 const remoteFields = {
   enabled: z.boolean(),
-  port: z.number().int().min(1024).max(65535)
+  port: z.number().int().min(1024).max(65535),
+  /** Izinkan layar kendali: melihat panel web dan mengirim klik, gulir, serta ketikan ke dalamnya. */
+  screenControl: z.boolean()
 }
-export const REMOTE_SETTINGS_DEFAULT = { enabled: false, port: 8787 }
+export const REMOTE_SETTINGS_DEFAULT = { enabled: false, port: 8787, screenControl: false }
 export const RemoteSettingsSchema = z.object({
   enabled: remoteFields.enabled.default(REMOTE_SETTINGS_DEFAULT.enabled),
-  port: remoteFields.port.default(REMOTE_SETTINGS_DEFAULT.port)
+  port: remoteFields.port.default(REMOTE_SETTINGS_DEFAULT.port),
+  screenControl: remoteFields.screenControl.default(REMOTE_SETTINGS_DEFAULT.screenControl)
 })
 /** Patch tanpa nilai bawaan (lihat AlertSettingsPatchSchema). */
 export const RemoteSettingsPatchSchema = z.object(remoteFields).partial().strict()

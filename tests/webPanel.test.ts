@@ -33,7 +33,7 @@ describe('pengaturan baru', () => {
   it('default: peringatan & kendali jarak jauh mati, templat/jadwal banner kosong', () => {
     const s = SettingsSchema.parse({})
     expect(s.alerts).toEqual({ enabled: false, afterMinutes: 5, notifyRecovery: true, webhookUrl: '', telegramChatId: '' })
-    expect(s.remote).toEqual({ enabled: false, port: 8787 })
+    expect(s.remote).toEqual({ enabled: false, port: 8787, screenControl: false })
     expect(s.bannerTemplates).toEqual([])
     expect(s.bannerSchedule).toEqual([])
   })
@@ -42,14 +42,14 @@ describe('pengaturan baru', () => {
     const s = SettingsSchema.parse({})
     const next = mergeSettings(s, { alerts: { enabled: true }, remote: { port: 9000 } })
     expect(next.alerts).toMatchObject({ enabled: true, afterMinutes: 5 })
-    expect(next.remote).toEqual({ enabled: false, port: 9000 })
+    expect(next.remote).toEqual({ enabled: false, port: 9000, screenControl: false })
   })
 
   it('patch yang divalidasi tidak menimpa opsi lain dengan nilai bawaan', () => {
     const s = mergeSettings(SettingsSchema.parse({}), { remote: { enabled: true, port: 18792 }, alerts: { afterMinutes: 15, notifyRecovery: false } })
     const remote = SettingsPatchSchema.parse({ remote: { enabled: false } })
     expect(remote).toEqual({ remote: { enabled: false } })
-    expect(mergeSettings(s, remote).remote).toEqual({ enabled: false, port: 18792 })
+    expect(mergeSettings(s, remote).remote).toEqual({ enabled: false, port: 18792, screenControl: false })
     const alerts = SettingsPatchSchema.parse({ alerts: { enabled: true } })
     expect(mergeSettings(s, alerts).alerts).toMatchObject({ enabled: true, afterMinutes: 15, notifyRecovery: false })
   })

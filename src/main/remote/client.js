@@ -21,6 +21,9 @@
   let timers = []
   /** Panel yang tombol kendalinya sedang terbuka. */
   let selectedTile = null
+  /** Panel yang menunggu ketukan kedua untuk dihapus. */
+  let confirmRemove = null
+  let confirmTimer = 0
 
   // ------------------------------------------------------------ util
   function el(tag, attrs, children) {
@@ -76,6 +79,7 @@
   function showLogin() {
     timers.forEach(clearInterval)
     timers = []
+    closeScreen()
     $('app').hidden = true
     $('login').hidden = false
     $('password').focus()
@@ -173,8 +177,13 @@
 
     // Jangan menggambar ulang saat kolom URL sedang diketik (isinya akan hilang).
     const focused = document.activeElement
+    const exists = (id) => s.monitors.some((m) => m.tiles.some((t) => t.id === id))
+    if (screenTile && (!s.screenControl || !exists(screenTile.id))) {
+      closeScreen()
+      toast(s.screenControl ? 'Panel tidak lagi tampil di wall' : 'Kendali layar dimatikan dari Operator', true)
+    }
     if (focused && focused.tagName === 'INPUT' && $('monitors').contains(focused)) return
-    if (selectedTile && !s.monitors.some((m) => m.tiles.some((t) => t.id === selectedTile))) selectedTile = null
+    if (selectedTile && !exists(selectedTile)) selectedTile = null
     $('monitors').replaceChildren(...s.monitors.map(renderMonitor))
   }
 
@@ -302,8 +311,224 @@
       )
     )
     if (web && t.pageUrl && t.pageUrl !== t.url) rows.push(el('p', { class: 'muted small page-url', text: `Sedang terbuka: ${t.pageUrl}` }))
+
+    const confirming = confirmRemove === t.id
+    rows.push(
+      el('div', { class: 'pad-row' }, [
+        web && state.screenControl ? btn('🖱 Kendalikan layar', 'Klik, gulir, dan ketik langsung di panel ini', () => openScreen(t), { class: 'primary' }) : null,
+        btn(confirming ? 'Ketuk lagi untuk menghapus' : '🗑 Hapus panel', 'Hapus panel ini dari wall', () => removeTile(t), { class: confirming ? 'danger' : '' })
+      ])
+    )
+    if (web && !state.screenControl) {
+      rows.push(el('p', { class: 'muted small pad-note', text: 'Kendali layar belum diizinkan. Aktifkan di Operator › Pengaturan › Kendali jarak jauh.' }))
+    }
     return el('div', { class: 'pad' }, rows)
   }
+
+  /** Hapus panel dengan dua ketukan supaya tidak terhapus karena salah sentuh. */
+  function removeTile(t) {
+    clearTimeout(confirmTimer)
+    if (confirmRemove !== t.id) {
+      confirmRemove = t.id
+      confirmTimer = setTimeout(() => {
+        confirmRemove = null
+        render()
+      }, 4000)
+      return render()
+    }
+    confirmRemove = null
+    selectedTile = null
+    void act('/api/tile/action', { id: t.id, action: 'remove' }, 'Panel dihapus')
+  }
+
+  // ------------------------------------------------------------ layar kendali
+  /** Jeda antara dua gambar layar; gambar berikutnya baru diminta setelah gambar sebelumnya tiba. */
+  const FRAME_GAP_MS = 80
+  const RETRY_MS = 1500
+  /** Geseran lebih dari ini (px) dianggap gulir/seret, bukan ketukan. */
+  const MOVE_PX = 8
+  const DOUBLE_TAP_MS = 350
+  let screenTile = null
+  /**
+   * Ukuran gambar terakhir yang tampil (0 = belum ada). naturalWidth tidak bisa dipakai langsung: bernilai 0 sesaat
+   * setiap gambar berikutnya dimuat, padahal gambar sebelumnya masih terlihat.
+   */
+  let frameSize = { w: 0, h: 0 }
+  let frameTimer = 0
+  let frameSeq = 0
+  let dragMode = false
+  let gesture = null
+  let lastTap = { at: 0, x: 0, y: 0 }
+  let inputQueue = Promise.resolve()
+
+  function openScreen(t) {
+    screenTile = { id: t.id, summary: t.summary }
+    $('screen-title').textContent = t.summary
+    $('screen-status').textContent = 'Memuat layar panel…'
+    $('screen-img').removeAttribute('src')
+    frameSize = { w: 0, h: 0 }
+    $('screen').hidden = false
+    document.body.classList.add('screen-open')
+    nextFrame()
+  }
+
+  function closeScreen() {
+    screenTile = null
+    gesture = null
+    clearTimeout(frameTimer)
+    $('screen').hidden = true
+    document.body.classList.remove('screen-open')
+  }
+
+  function nextFrame() {
+    clearTimeout(frameTimer)
+    if (!screenTile || document.hidden) return
+    const view = $('screen-img').parentElement
+    const w = Math.min(1920, Math.max(320, Math.round(view.clientWidth * (window.devicePixelRatio || 1))))
+    $('screen-img').src = `/api/tile/screen?id=${encodeURIComponent(screenTile.id)}&w=${w}&n=${++frameSeq}`
+  }
+
+  $('screen-img').addEventListener('load', () => {
+    const i = $('screen-img')
+    frameSize = { w: i.naturalWidth, h: i.naturalHeight }
+    $('screen-status').textContent = ''
+    frameTimer = setTimeout(nextFrame, FRAME_GAP_MS)
+  })
+  $('screen-img').addEventListener('error', async () => {
+    if (!screenTile) return
+    // Ambil pesan galat dari server (panel tersembunyi, belum diizinkan, sesi berakhir, …).
+    try {
+      const res = await fetch(`/api/tile/screen?id=${encodeURIComponent(screenTile.id)}&w=320`, { credentials: 'same-origin' })
+      if (res.status === 401) return showLogin()
+      const data = res.ok ? {} : await res.json().catch(() => ({}))
+      $('screen-status').textContent = data.error || ''
+    } catch {
+      $('screen-status').textContent = 'Koneksi ke wall terputus, mencoba lagi…'
+    }
+    frameTimer = setTimeout(nextFrame, RETRY_MS)
+  })
+
+  /** Kirim masukan berurutan (urutan klik/gulir harus sama dengan urutan sentuhan). */
+  function sendInput(input) {
+    if (!screenTile) return
+    const id = screenTile.id
+    inputQueue = inputQueue
+      .then(() => api('/api/tile/input', { id, input }))
+      .catch((err) => toast(err.message, true))
+  }
+
+  /** Area gambar panel di layar (gambar diperbesar/diperkecil agar pas, dengan bingkai kosong di sisinya). */
+  function frameRect() {
+    const r = $('screen-img').getBoundingClientRect()
+    const scale = Math.min(r.width / frameSize.w, r.height / frameSize.h)
+    const width = frameSize.w * scale
+    const height = frameSize.h * scale
+    return { left: r.left + (r.width - width) / 2, top: r.top + (r.height - height) / 2, width, height }
+  }
+
+  /** Posisi sentuhan relatif terhadap gambar panel (0..1). */
+  function relPos(e) {
+    const r = frameRect()
+    return {
+      x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+    }
+  }
+
+  const img = $('screen-img')
+  img.addEventListener('contextmenu', (e) => e.preventDefault())
+  img.addEventListener('pointerdown', (e) => {
+    if (!frameSize.w) return
+    const r = frameRect()
+    if (e.clientX < r.left || e.clientX > r.left + r.width || e.clientY < r.top || e.clientY > r.top + r.height) return
+    e.preventDefault()
+    try {
+      img.setPointerCapture(e.pointerId)
+    } catch {
+      /* sebagian browser menolak; gerakan tetap terbaca selama jari di atas gambar */
+    }
+    gesture = { id: e.pointerId, sx: e.clientX, sy: e.clientY, lx: e.clientX, ly: e.clientY, start: relPos(e), moved: false, dragging: false, lastMove: 0, flush: 0, dx: 0, dy: 0 }
+  })
+  img.addEventListener('pointermove', (e) => {
+    const g = gesture
+    if (!g || g.id !== e.pointerId) return
+    if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < MOVE_PX) return
+    g.moved = true
+    const r = frameRect()
+    if (dragMode) {
+      if (!g.dragging) {
+        g.dragging = true
+        sendInput({ kind: 'drag', phase: 'start', ...g.start })
+      }
+      const now = Date.now()
+      if (now - g.lastMove >= 40) {
+        g.lastMove = now
+        sendInput({ kind: 'drag', phase: 'move', ...relPos(e) })
+      }
+    } else {
+      // Kumpulkan geseran lalu kirim paling sering setiap 50 ms.
+      g.dx += (e.clientX - g.lx) / r.width
+      g.dy += (e.clientY - g.ly) / r.height
+      if (!g.flush) g.flush = setTimeout(() => flushScroll(g), 50)
+    }
+    g.lx = e.clientX
+    g.ly = e.clientY
+  })
+
+  function flushScroll(g) {
+    clearTimeout(g.flush)
+    g.flush = 0
+    if (!g.dx && !g.dy) return
+    sendInput({ kind: 'scroll', ...g.start, dx: g.dx, dy: g.dy })
+    g.dx = g.dy = 0
+  }
+
+  function endGesture(e, cancelled) {
+    const g = gesture
+    if (!g || g.id !== e.pointerId) return
+    gesture = null
+    if (g.dragging) return sendInput({ kind: 'drag', phase: 'end', ...relPos(e) })
+    if (g.moved) return flushScroll(g)
+    if (cancelled) return
+    const now = Date.now()
+    const double = now - lastTap.at < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30
+    lastTap = double ? { at: 0, x: 0, y: 0 } : { at: now, x: e.clientX, y: e.clientY }
+    sendInput({ kind: 'tap', ...g.start, count: double ? 2 : 1 })
+  }
+  img.addEventListener('pointerup', (e) => endGesture(e, false))
+  img.addEventListener('pointercancel', (e) => endGesture(e, true))
+  // Roda mouse (kendali dari komputer lain): gulir ke arah yang sama seperti di browser biasa.
+  img.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault()
+      if (!frameSize.w) return
+      const r = frameRect()
+      sendInput({ kind: 'scroll', ...relPos(e), dx: -e.deltaX / r.width, dy: -e.deltaY / r.height })
+    },
+    { passive: false }
+  )
+
+  $('screen-mode').addEventListener('click', () => {
+    dragMode = !dragMode
+    $('screen-mode').textContent = dragMode ? 'Geser: seret' : 'Geser: gulir'
+    $('screen-mode').className = dragMode ? 'on' : ''
+  })
+  for (const b of document.querySelectorAll('#screen [data-key]')) {
+    b.addEventListener('click', () => sendInput({ kind: 'key', key: b.dataset.key }))
+  }
+  function sendText(withEnter) {
+    const text = $('screen-text').value
+    if (text) sendInput({ kind: 'text', text })
+    if (withEnter) sendInput({ kind: 'key', key: 'Enter' })
+    $('screen-text').value = ''
+  }
+  $('screen-type').addEventListener('submit', (e) => {
+    e.preventDefault()
+    sendText(false)
+  })
+  $('screen-send-enter').addEventListener('click', () => sendText(true))
+  $('screen-close').addEventListener('click', closeScreen)
 
   $('preset-prev').addEventListener('click', () => act('/api/preset/step', { dir: -1 }))
   $('preset-next').addEventListener('click', () => act('/api/preset/step', { dir: 1 }))
@@ -331,6 +556,7 @@
     if (!document.hidden && !$('app').hidden) {
       void refreshState()
       void refreshThumbs()
+      nextFrame()
     }
   })
 

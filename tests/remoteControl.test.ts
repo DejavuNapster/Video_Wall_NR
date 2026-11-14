@@ -13,12 +13,15 @@ function setup(view: Partial<MonitorView> = {}, presetIds = ['a', 'b', 'c'], act
     setWindowFullscreen: vi.fn(() => ok),
     stepTilePage: vi.fn(() => ok),
     reloadAllInSlot: vi.fn(() => ok),
-    showWalls: vi.fn()
+    showWalls: vi.fn(),
+    captureTileFrame: vi.fn(async () => ({ jpeg: Buffer.from([0xff, 0xd8]) })),
+    sendTileInput: vi.fn(() => ok)
   }
   const deps = {
     wall,
     zoomTile: vi.fn(async () => ok),
     setSource: vi.fn(async () => ok),
+    removeTile: vi.fn(async () => ok),
     presetIds: () => presetIds,
     activeId: () => activeId,
     activatePreset: vi.fn(async () => ok)
@@ -27,6 +30,24 @@ function setup(view: Partial<MonitorView> = {}, presetIds = ['a', 'b', 'c'], act
 }
 
 describe('WallRemoteControl', () => {
+  it('hapus panel memakai monitor tempat panel berada', async () => {
+    const { ctl, deps } = setup()
+    expect(await ctl.tile('t1', 'remove')).toEqual(ok)
+    expect(deps.removeTile).toHaveBeenCalledWith(1, 't1')
+    expect((await ctl.tile('luar', 'remove')).ok).toBe(false)
+  })
+
+  it('layar kendali hanya untuk panel di preset yang tampil', async () => {
+    const { ctl, wall } = setup()
+    expect(await ctl.screenFrame('t1', 800)).toHaveProperty('jpeg')
+    expect(wall.captureTileFrame).toHaveBeenCalledWith('t1', 800)
+    expect(await ctl.screenFrame('luar', 800)).toHaveProperty('error')
+    expect(ctl.screenInput('t1', { kind: 'key', key: 'Enter' })).toEqual(ok)
+    expect(wall.sendTileInput).toHaveBeenCalledWith('t1', { kind: 'key', key: 'Enter' })
+    expect(ctl.screenInput('luar', { kind: 'key', key: 'Tab' }).ok).toBe(false)
+    expect(wall.sendTileInput).toHaveBeenCalledTimes(1)
+  })
+
   it('aksi panel diteruskan ke monitor tempat panel berada', async () => {
     const { ctl, wall, deps } = setup()
     await ctl.tile('t1', 'back')

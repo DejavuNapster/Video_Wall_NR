@@ -119,10 +119,16 @@ export interface AppState {
 /** Status server kendali jarak jauh. */
 export interface RemoteStatus {
   running: boolean
-  /** Alamat yang bisa dibuka dari perangkat lain, mis. http://192.168.1.20:8787 */
+  /** Alamat yang bisa dibuka dari perangkat lain, mis. https://192.168.1.20:8787 */
   urls: string[]
   passwordSet: boolean
+  /** Sidik jari SHA-256 sertifikat HTTPS yang sedang dipakai (untuk dicocokkan di browser). */
+  fingerprint?: string
+  /** Sertifikat berlaku sampai (ISO). */
+  certValidTo?: string
   error?: string
+  /** Masalah yang tidak menghentikan server, mis. sertifikat tidak bisa disimpan. */
+  warning?: string
 }
 
 export interface AutostartStatus {
