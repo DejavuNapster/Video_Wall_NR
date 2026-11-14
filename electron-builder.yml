@@ -39,7 +39,8 @@ toolsets:
 win:
   executableName: video-wall-browser
   icon: build/icon.ico
-  artifactName: ${name}-${version}-${arch}.${ext}
+  # Nama file rilis: Video_Wall_NR_v<versi>_<OS>_<arsitektur>[_jenis].<ext>
+  artifactName: Video_Wall_NR_v${version}_Windows_${arch}_Setup.${ext}
   # Sidecar MediaMTX Windows — hanya mediamtx.exe (bukan binary Linux).
   extraResources:
     - from: resources/bin
@@ -62,11 +63,9 @@ nsis:
   # Autostart Windows: via per-machine install + shortcut (lihat README "Autostart Windows").
   # (Kode autostart di main memakai app.setLoginItemSettings saat runtime.)
 
-# Portable: beri nama TERPISAH dari installer NSIS. Sebelumnya keduanya memakai
-# win.artifactName yang sama (x64.exe), sehingga portable (dibangun terakhir)
-# menimpa installer NSIS. Sekarang: x64-portable.exe.
+# Portable: nama TERPISAH dari installer NSIS (nama sama = portable menimpa installer).
 portable:
-  artifactName: ${name}-${version}-${arch}-portable.${ext}
+  artifactName: Video_Wall_NR_v${version}_Windows_${arch}_Portable.${ext}
 
 # ---- macOS (dmg + zip, Intel x64 + Apple Silicon arm64) ----
 # Dibangun di runner macOS GitHub Actions (.github/workflows/release.yml).
@@ -81,7 +80,7 @@ mac:
   identity: null
   hardenedRuntime: false
   icon: build/icon.png
-  artifactName: ${name}-${version}-mac-${arch}.${ext}
+  artifactName: Video_Wall_NR_v${version}_macOS_${arch}.${ext}
   extraResources:
     - from: resources/bin-darwin-${arch}
       to: bin
@@ -101,7 +100,7 @@ linux:
   icon: build/icon.png
   category: Multimedia
   synopsis: Video wall multi-monitor (web + video)
-  artifactName: ${name}-${version}-${arch}.${ext}
+  artifactName: Video_Wall_NR_v${version}_Linux_${arch}.${ext}
   # Sidecar MediaMTX Linux — hanya mediamtx (bukan .exe).
   extraResources:
     - from: resources/bin

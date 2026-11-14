@@ -208,11 +208,11 @@ terpasang**: Windows akan menganggapnya aplikasi lain (dua entri uninstall/short
 
 ## Instalasi
 
-- **Windows**: jalankan installer (`-x64.exe`) atau versi portable (`-x64-portable.exe`). Aktifkan
+- **Windows**: jalankan installer (`_Windows_x64_Setup.exe`) atau versi portable (`_Windows_x64_Portable.exe`). Aktifkan
   **Jalan otomatis saat login** di Operator › Pengaturan, dan auto-login Windows (`netplwiz`) untuk akun wall.
-- **Ubuntu / Debian**: `sudo apt install ./video-wall-browser-<versi>-amd64.deb`
-- **Linux lain**: `chmod +x video-wall-browser-<versi>-x86_64.AppImage` lalu jalankan.
-- **macOS**: buka `.dmg` (`mac-arm64` untuk Apple Silicon, `mac-x64` untuk Intel), seret ke *Applications*, lalu
+- **Ubuntu / Debian**: `sudo apt install ./Video_Wall_NR_v<versi>_Linux_amd64.deb`
+- **Linux lain**: `chmod +x Video_Wall_NR_v<versi>_Linux_x86_64.AppImage` lalu jalankan.
+- **macOS**: buka `.dmg` (`macOS_arm64` untuk Apple Silicon, `macOS_x64` untuk Intel), seret ke *Applications*, lalu
   `xattr -cr "/Applications/Video Wall Browser.app"` sekali sebelum dibuka.
 
 ### X11 vs Wayland

@@ -4,12 +4,12 @@ Aplikasi desktop video wall multi-monitor: panel halaman web, kamera RTSP, HLS, 
 
 | Sistem | File |
 | --- | --- |
-| Windows 10/11 (x64) — installer | `video-wall-browser-<versi>-x64.exe` |
-| Windows 10/11 (x64) — portable (tanpa instal) | `video-wall-browser-<versi>-x64-portable.exe` |
-| Ubuntu / Debian (x64) | `video-wall-browser-<versi>-amd64.deb` |
-| Linux lain (x64) | `video-wall-browser-<versi>-x86_64.AppImage` |
-| macOS Apple Silicon (M1/M2/M3/M4) | `video-wall-browser-<versi>-mac-arm64.dmg` (atau `.zip`) |
-| macOS Intel | `video-wall-browser-<versi>-mac-x64.dmg` (atau `.zip`) |
+| Windows 10/11 (x64) — installer | `Video_Wall_NR_v<versi>_Windows_x64_Setup.exe` |
+| Windows 10/11 (x64) — portable (tanpa instal) | `Video_Wall_NR_v<versi>_Windows_x64_Portable.exe` |
+| Ubuntu / Debian (x64) | `Video_Wall_NR_v<versi>_Linux_amd64.deb` |
+| Linux lain (x64) | `Video_Wall_NR_v<versi>_Linux_x86_64.AppImage` |
+| macOS Apple Silicon (M1/M2/M3/M4) | `Video_Wall_NR_v<versi>_macOS_arm64.dmg` (atau `.zip`) |
+| macOS Intel | `Video_Wall_NR_v<versi>_macOS_x64.dmg` (atau `.zip`) |
 
 `SHA256SUMS.txt` berisi checksum semua file.
 
@@ -21,14 +21,14 @@ klik *More info* → *Run anyway*.
 **Ubuntu / Debian**
 
 ```bash
-sudo apt install ./video-wall-browser-<versi>-amd64.deb
+sudo apt install ./Video_Wall_NR_v<versi>_Linux_amd64.deb
 ```
 
 **AppImage**
 
 ```bash
-chmod +x video-wall-browser-<versi>-x86_64.AppImage
-./video-wall-browser-<versi>-x86_64.AppImage
+chmod +x Video_Wall_NR_v<versi>_Linux_x86_64.AppImage
+./Video_Wall_NR_v<versi>_Linux_x86_64.AppImage
 ```
 
 **macOS** — buka `.dmg`, seret *Video Wall Browser* ke *Applications*. Aplikasi belum ditandatangani Apple
