@@ -18,11 +18,16 @@ Aplikasi desktop video wall multi-monitor: panel halaman web, kamera RTSP, HLS, 
 **Windows** — jalankan installer. SmartScreen mungkin memperingatkan karena aplikasi belum ditandatangani:
 klik *More info* → *Run anyway*.
 
-**Ubuntu / Debian**
+**Ubuntu / Debian** — pasang dengan `dpkg`:
 
 ```bash
-sudo apt install ./Video_Wall_NR_v<versi>_Linux_amd64.deb
+sudo dpkg -i Video_Wall_NR_v<versi>_Linux_amd64.deb
 ```
+
+Bila `dpkg` melaporkan dependensi yang kurang, lengkapi dengan `sudo apt-get install -f`, lalu jalankan dari menu
+aplikasi atau dengan perintah `video-wall-browser`. Di sesi Wayland (bawaan Ubuntu Desktop), aplikasi otomatis
+berjalan lewat X11 (XWayland) agar setiap monitor wall mendapat jendelanya sendiri. Untuk wall permanen, sesi
+**Ubuntu on Xorg** (pilih di layar login) tetap disarankan.
 
 **AppImage**
 

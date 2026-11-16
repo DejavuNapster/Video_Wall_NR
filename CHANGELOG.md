@@ -4,6 +4,26 @@ Semua perubahan penting pada Video Wall NR dicatat di berkas ini, versi terbaru 
 setiap versi juga ditampilkan di halaman [Releases](https://github.com/DejavuNapster/Video_Wall_NR/releases).
 Versi 0.2.3 dan 0.2.4 hanya dicatat di sini dan tidak tersedia untuk diunduh.
 
+## [0.2.11] - 2026-11-17
+
+### Diperbaiki
+
+- **Linux (Ubuntu Desktop): latar wall berkedip dan jendela wall tidak tampil di monitornya.** Sejak Electron 38,
+  aplikasi berjalan sebagai aplikasi Wayland native di sesi Wayland (bawaan Ubuntu Desktop). Di Wayland, aplikasi
+  tidak bisa menempatkan jendela ke monitor tertentu, sehingga jendela wall untuk beberapa monitor menumpuk dan
+  berebut layar penuh. Paket `.deb` dan AppImage juga tidak memaksa mode X11 seperti yang tertulis di dokumentasi.
+  Kini aplikasi otomatis memulai ulang dirinya sekali lewat X11 (XWayland) di sesi Wayland, dari menu aplikasi,
+  terminal, AppImage, maupun jalan otomatis saat login. `VW_OZONE=wayland` tetap memakai Wayland native.
+- Pratinjau teks berjalan di Inspector tidak lagi melebar keluar kolom saat scrollbar Inspector muncul.
+- Pesan peringatan Wayland di Operator tidak lagi merujuk ke `install.sh` yang tidak ada.
+
+### Diubah
+
+- Petunjuk instalasi Ubuntu/Debian kini memakai `sudo dpkg -i …deb` (bila ada dependensi yang kurang:
+  `sudo apt-get install -f`).
+- README dilengkapi tangkapan layar: wall (Mode Tampil dan Mode Atur), Operator, Inspector dan gaya teks berjalan,
+  serta kendali jarak jauh di ponsel.
+
 ## [0.2.10] - 2026-11-17
 
 ### Ditambahkan

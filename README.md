@@ -12,6 +12,8 @@ Pembagian tugas:
 
 Semua perubahan (dari wall maupun Operator) langsung tampil di wall dan tersimpan otomatis.
 
+![Wall dalam Mode Tampil: dashboard web, status layanan, jam, dan teks berjalan dengan label INFO](docs/screenshots/wall.png)
+
 Riwayat perubahan setiap versi ada di [CHANGELOG.md](CHANGELOG.md).
 
 ## Teknologi
@@ -91,7 +93,7 @@ Pada server tanpa layar: `xvfb-run -a npm run dev -- -- --virtual-displays=4 --n
 | `--hide-operator` | `VW_HIDE_OPERATOR=1` | Mulai tanpa menampilkan UI operator |
 | – | `VW_NO_GPU_FLAGS=1` | Jangan aktifkan flag decode GPU |
 | – | `VW_ENABLE_FEATURES=...` | Tambah fitur Chromium |
-| – | `VW_OZONE=x11\|wayland` | Dibaca launcher Linux |
+| – | `VW_OZONE=wayland` | Linux: tetap Wayland native (bawaan: di sesi Wayland aplikasi otomatis berjalan lewat X11/XWayland) |
 | – | `VW_TELEGRAM_API=http://…` | Alamat Bot API Telegram lain (hanya untuk pengujian dengan server tiruan) |
 
 Pintasan global: **Ctrl+Alt+O** tampilkan operator, **Ctrl+Alt+W** tampilkan wall di depan, **Ctrl+Alt+Q** keluar.
@@ -105,6 +107,8 @@ Setiap monitor wall punya dua mode (berlaku untuk semua monitor, tersimpan di pe
 
 - **Mode Atur**: toolbar di atas dan bilah di atas setiap panel.
 - **Mode Tampil** (Ctrl+E, atau tombol di toolbar/Operator): semua bilah disembunyikan, wall bersih.
+
+![Wall dalam Mode Atur: toolbar di atas dan bilah navigasi, URL, zoom, serta tombol di setiap panel](docs/screenshots/wall-atur.png)
 
 Semua perubahan di wall **langsung tampil dan tersimpan otomatis** ke preset aktif; Operator ikut diperbarui.
 Menyimpan preset aktif dari Operator juga langsung diterapkan ke wall.
@@ -142,6 +146,8 @@ keluar). Kelola preset, rotasi, dan pengaturan aplikasi ada di jendela Operator.
 
 Dibuka otomatis saat aplikasi mulai (kecuali `--hide-operator`), lewat menu ☰ di wall, atau **Ctrl+Alt+O**.
 
+![Jendela Operator: daftar preset, peta monitor dengan pratinjau langsung, dan Inspector panel teks berjalan](docs/screenshots/operator.png)
+
 - **Sidebar Preset**: klik untuk menampilkan di wall · + Baru · ganti nama / Duplikat / Hapus preset aktif.
 - **Monitor & Panel**: peta isi setiap monitor dengan status panel (berjalan / gagal / beku) dan **pratinjau
   langsung** (cuplikan isi panel, diperbarui tiap ±4 detik; bisa dimatikan). Klik panel untuk membuka
@@ -162,6 +168,13 @@ Dibuka otomatis saat aplikasi mulai (kecuali `--hide-operator`), lewat menu ☰ 
     latar polos atau gradasi, serta gaya siap pakai (Berita, Neon, Emas 3D, Papan LED, Peringatan, Garis tepi,
     Polos).
   - **Efek teks**: bayangan, 3D, garis tepi, atau berpendar, dengan warna dan kekuatan yang bisa diatur.
+
+  <table>
+    <tr>
+      <td valign="top"><img src="docs/screenshots/teks-berjalan-gaya.png" alt="Contoh gaya siap pakai teks berjalan: Berita, Emas 3D, Neon, Papan LED, Garis tepi, dan Peringatan" width="560"></td>
+      <td valign="top"><img src="docs/screenshots/inspector-teks.png" alt="Inspector panel teks berjalan: isi, gerak, gaya teks, dan efek teks" width="220"></td>
+    </tr>
+  </table>
 
   Posisi/ukuran panel diatur di wall (Mode Atur).
 - **Otomatisasi**: rotasi preset (interval, hanya di Mode Tampil) dan jadwal preset per jam + hari. Selama ada
@@ -221,6 +234,11 @@ Balasan berisi tombol (mis. ◀️ Sebelum · 🔄 Segarkan · Berikut ▶️ di
 ### Kendali jarak jauh
 
 Operasikan wall dari ponsel atau komputer lain di jaringan yang sama melalui browser (HTTPS):
+
+<p>
+  <img src="docs/screenshots/remote.png" alt="Halaman kendali jarak jauh di ponsel: tampilan, preset, banner, dan daftar panel" width="280">
+  <img src="docs/screenshots/remote-teks.png" alt="Kendali panel teks berjalan dari ponsel: jeda, ganti teks, gerak, kecepatan, dan gaya" width="280">
+</p>
 
 - **Tampilan & preset:** Mode Tampil / Mode Atur, rotasi preset, pilih preset, atau preset sebelumnya/berikutnya (◀ ▶).
 - **Banner:** tampilkan templat banner atau banner cepat, tutup banner.
@@ -307,16 +325,21 @@ terpasang**: Windows akan menganggapnya aplikasi lain (dua entri uninstall/short
 
 - **Windows**: jalankan installer (`_Windows_x64_Setup.exe`) atau versi portable (`_Windows_x64_Portable.exe`). Aktifkan
   **Jalan otomatis saat login** di Operator › Pengaturan, dan auto-login Windows (`netplwiz`) untuk akun wall.
-- **Ubuntu / Debian**: `sudo apt install ./Video_Wall_NR_v<versi>_Linux_amd64.deb`
+- **Ubuntu / Debian**: `sudo dpkg -i Video_Wall_NR_v<versi>_Linux_amd64.deb`. Bila `dpkg` melaporkan dependensi
+  yang kurang, lengkapi dengan `sudo apt-get install -f` (hanya melengkapi dependensi; aplikasinya tetap dipasang
+  oleh `dpkg`). Jalankan dari menu aplikasi atau perintah `video-wall-browser`.
 - **Linux lain**: `chmod +x Video_Wall_NR_v<versi>_Linux_x86_64.AppImage` lalu jalankan.
 - **macOS**: buka `.dmg` (`macOS_arm64` untuk Apple Silicon, `macOS_x64` untuk Intel), seret ke *Applications*, lalu
   `xattr -cr "/Applications/Video Wall NR.app"` sekali sebelum dibuka.
 
 ### X11 vs Wayland
 
-- Default launcher memakai **X11** (di sesi Wayland berjalan via XWayland). Penempatan window fullscreen per monitor
-  di Wayland murni dibatasi compositor, jadi untuk video wall disarankan sesi **Xorg**.
-- Untuk menguji Wayland native: `VW_OZONE=wayland video-wall-browser`.
+- Di Wayland, aplikasi tidak bisa menempatkan window ke monitor tertentu, sehingga window wall bisa menumpuk dan
+  latarnya berkedip. Karena itu, di sesi Wayland (bawaan Ubuntu Desktop) aplikasi **otomatis memulai ulang dirinya
+  sekali lewat X11** (XWayland, `--ozone-platform=x11`). Ini berlaku untuk menu aplikasi, terminal, AppImage, dan
+  jalan otomatis saat login.
+- Sesi **Ubuntu on Xorg** (pilih di layar login) tetap disarankan untuk wall permanen.
+- Untuk menguji Wayland native: `VW_OZONE=wayland video-wall-browser` (Operator akan menampilkan peringatan).
 - Auto-login grafis perlu diaktifkan agar wall menyala sendiri setelah reboot.
 
 ## Data & log

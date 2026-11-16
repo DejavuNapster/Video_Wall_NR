@@ -7,7 +7,7 @@ import type { AutostartStatus, Result } from '@shared/types'
 
 const LINUX_DIR = join(homedir(), '.config', 'autostart')
 const LINUX_FILE = join(LINUX_DIR, 'video-wall-browser.desktop')
-/** Launcher dari scripts/linux/install.sh (memaksa --ozone-platform=x11). */
+/** Launcher buatan sendiri (opsional); bila tidak ada, dipakai biner aplikasi. Mode X11 diatur aplikasi sendiri (ozone.ts). */
 const LINUX_LAUNCHER = '/usr/local/bin/video-wall-browser'
 /** Argumen saat jalan otomatis. Di Windows, status login item hanya cocok bila argumen query sama. */
 const LOGIN_ARGS = ['--hide-operator']

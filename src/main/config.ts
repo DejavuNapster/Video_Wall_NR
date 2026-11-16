@@ -59,8 +59,9 @@ export function platformWarnings(info: PlatformInfo): string[] {
   const warnings: string[] = []
   if (info.os === 'linux' && info.session === 'wayland' && info.ozonePlatform !== 'x11') {
     warnings.push(
-      'Sesi Wayland terdeteksi tanpa --ozone-platform=x11. Di Wayland, aplikasi tidak bisa menempatkan window ke monitor tertentu, ' +
-        'sehingga semua window wall bisa menumpuk di satu layar. Jalankan lewat launcher resmi (install.sh) atau pilih sesi "Ubuntu on Xorg".'
+      'Aplikasi berjalan sebagai Wayland native (VW_OZONE=wayland, --ozone-platform selain x11, atau XWayland tidak tersedia). ' +
+        'Di Wayland, aplikasi tidak bisa menempatkan window ke monitor tertentu, sehingga window wall bisa menumpuk dan berkedip. ' +
+        'Jalankan tanpa opsi tersebut agar otomatis memakai X11, atau pilih sesi "Ubuntu on Xorg" saat login.'
     )
   }
   return warnings

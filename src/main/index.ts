@@ -19,6 +19,7 @@ import { registerHandlers, VAULT_REMOTE_PASSWORD, VAULT_REMOTE_TLS, VAULT_TELEGR
 import { createLogger } from './logger'
 import { migrateLegacyUserData } from './migrate'
 import { createOperatorWindow, forceCloseOperator } from './operator'
+import { x11RelaunchArgs } from './ozone'
 import { WallRemoteControl } from './remote/control'
 import { RemoteServer } from './remote/server'
 import { TlsStore } from './remote/tls'
@@ -441,16 +442,25 @@ async function bootstrap(): Promise<void> {
   })
 }
 
-// Sebelum kunci instance & log pertama: keduanya memakai folder userData.
-migrateLegacyUserData()
+// Linux + Wayland: mulai ulang sekali lewat X11 agar jendela wall bisa ditempatkan per monitor (lihat ozone.ts).
+const x11Args = x11RelaunchArgs(process.platform, process.env, process.argv)
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit()
+if (x11Args) {
+  // AppImage: execPath menunjuk ke folder mount sementara yang hilang saat proses ini keluar.
+  app.relaunch({ args: x11Args, ...(process.env['APPIMAGE'] ? { execPath: process.env['APPIMAGE'] } : {}) })
+  app.exit(0)
 } else {
-  app.on('second-instance', showOperator)
-  app.on('window-all-closed', () => app.quit())
-  void app.whenReady().then(bootstrap).catch((err) => {
-    log.error('bootstrap gagal', err)
-    app.exit(1)
-  })
+  // Sebelum kunci instance & log pertama: keduanya memakai folder userData.
+  migrateLegacyUserData()
+
+  if (!app.requestSingleInstanceLock()) {
+    app.quit()
+  } else {
+    app.on('second-instance', showOperator)
+    app.on('window-all-closed', () => app.quit())
+    void app.whenReady().then(bootstrap).catch((err) => {
+      log.error('bootstrap gagal', err)
+      app.exit(1)
+    })
+  }
 }

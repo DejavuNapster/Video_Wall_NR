@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { defaultSource } from '@shared/editor'
 import { isNativeSource } from '@shared/native'
 import { TICKER_FONTS, TICKER_SPEEDS, TICKER_STYLES, tickerBackground, type TickerSource } from '@shared/ticker'
@@ -398,6 +398,18 @@ function TickerSettings({
 }): React.JSX.Element {
   const app = useOperator((s) => s.app)
   const set = (patch: Partial<TickerSource>): void => onChange({ ...src, ...patch })
+  // Lebar kolom Inspector yang benar-benar tersedia (berkurang saat scrollbar muncul).
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [boxW, setBoxW] = useState(300)
+  useLayoutEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const update = (): void => setBoxW(el.clientWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Pratinjau digambar seukuran panel sebenarnya (perkiraan dari bagian grid monitor) lalu diperkecil.
   const display = app?.displays.find((d) => d.slot === monitor.slot)
@@ -405,13 +417,13 @@ function TickerSettings({
   const screenH = display?.bounds.height ?? 1080
   const panelW = Math.max(40, Math.round((tile.w / monitor.cols) * screenW))
   const panelH = Math.max(20, Math.round((tile.h / monitor.rows) * screenH))
-  const scale = Math.min(306 / panelW, 140 / panelH)
+  const scale = Math.min(Math.max(1, boxW - 2) / panelW, 140 / panelH)
   const moving = src.motion !== 'static'
   const separators = SEPARATORS.includes(src.separator) ? SEPARATORS : [src.separator, ...SEPARATORS]
 
   return (
     <>
-      <div className="flex flex-col gap-2">
+      <div ref={boxRef} className="flex flex-col gap-2">
         <div
           className="mx-auto overflow-hidden rounded border border-slate-700"
           style={{ width: Math.round(panelW * scale), height: Math.round(panelH * scale) }}
