@@ -212,6 +212,52 @@ export function CommitColor({ value, onCommit, label }: { value: string; onCommi
   )
 }
 
+/** Penggeser angka: dikirim dengan jeda singkat (seperti CommitColor) supaya geseran tidak membanjiri IPC. */
+export function CommitRange({
+  value,
+  min,
+  max,
+  step = 1,
+  onCommit,
+  label,
+  format = String
+}: {
+  value: number
+  min: number
+  max: number
+  step?: number
+  onCommit: (value: number) => void
+  label: string
+  format?: (value: number) => string
+}): React.JSX.Element {
+  const [draft, setDraft] = useState(value)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => setDraft(value), [value])
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="range"
+        aria-label={label}
+        min={min}
+        max={max}
+        step={step}
+        value={draft}
+        onChange={(e) => {
+          const v = Number(e.target.value)
+          setDraft(v)
+          if (timer.current) clearTimeout(timer.current)
+          timer.current = setTimeout(() => onCommit(v), 250)
+        }}
+        className="h-1.5 min-w-0 flex-1 cursor-pointer accent-sky-500"
+      />
+      <span className="w-10 shrink-0 text-right text-xs tabular-nums text-slate-400">{format(draft)}</span>
+    </div>
+  )
+}
+
 /** Teks kecil berwarna untuk status. */
 export function Pill({ tone, children, title }: { tone: 'ok' | 'warn' | 'error' | 'info' | 'muted'; children: React.ReactNode; title?: string }): React.JSX.Element {
   const tones = {

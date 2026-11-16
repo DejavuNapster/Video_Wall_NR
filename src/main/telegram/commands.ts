@@ -1,5 +1,6 @@
 import { BANNER_THEMES } from '@shared/bannerThemes'
 import { EmergencyBannerSchema } from '@shared/schema'
+import { TickerPatchSchema, type TickerPatch, type TickerSource } from '@shared/ticker'
 import { tileSummary } from '@shared/tileSummary'
 import type { AppState, EmergencyBanner, Result, TileState } from '@shared/types'
 import type { Keyboard, Photo } from './api'
@@ -17,6 +18,8 @@ export interface WallFacade {
   clearBanner(): void
   reloadMonitor(slot: number): Result
   reloadTile(slot: number, tileId: string): Result
+  /** Ubah panel teks berjalan (teks, jeda/jalan). */
+  setTicker(slot: number, tileId: string, patch: TickerPatch): Promise<Result>
   /** Gambar JPEG panel yang sedang terlihat (null = tidak tampil / gagal diambil). */
   capture(tileId: string): Promise<Buffer | null>
 }
@@ -64,6 +67,8 @@ const ALIASES: Record<string, string> = {
   reload: 'muatulang',
   foto: 'foto',
   screenshot: 'foto',
+  teks: 'teks',
+  ticker: 'teks',
   id: 'id'
 }
 
@@ -82,6 +87,7 @@ export const BOT_COMMANDS: Array<{ command: string; description: string }> = [
   { command: 'templat', description: 'Tampilkan templat banner' },
   { command: 'tutupbanner', description: 'Tutup banner' },
   { command: 'muatulang', description: 'Muat ulang panel (semua, monitor, atau panel)' },
+  { command: 'teks', description: 'Teks berjalan: ganti teks, jeda, jalankan' },
   { command: 'id', description: 'Chat ID dan user ID Anda' },
   { command: 'bantuan', description: 'Daftar perintah' }
 ]
@@ -180,6 +186,11 @@ export function helpMessage(host: string): Reply {
       bold('🔄 Panel'),
       c('/muatulang', 'muat ulang semua panel'),
       c('/muatulang', 'monitor 2, atau panel 3 di monitor 2', '2 · 2.3'),
+      '',
+      bold('✏️ Teks berjalan'),
+      c('/teks', 'daftar panel teks berjalan beserta tombol jeda/jalan'),
+      c('/teks', 'ganti teks panel 1.2 (satu pesan per baris)', '1.2 Rapat pukul 14.00'),
+      c('/teks', 'jeda atau jalankan lagi', '1.2 jeda · 1.2 jalan'),
       '',
       md`🪪 /id — chat ID dan user ID Anda`,
       italic('Nomor panel (mis. 2.3) sama dengan yang tertera di /status.')
@@ -409,6 +420,106 @@ async function photos(w: WallFacade, arg: string): Promise<Reply> {
   }
 }
 
+// ------------------------------------------------------------------ teks berjalan
+
+type TickerPanel = PanelRef & { source: TickerSource }
+
+/** Panel teks berjalan di monitor wall yang aktif, dengan nomor yang sama seperti di /status. */
+function tickerPanels(s: AppState): TickerPanel[] {
+  const out: TickerPanel[] = []
+  for (const m of wallMonitors(s)) {
+    const tiles = s.activePreset?.monitors.find((x) => x.slot === m.slot)?.tiles ?? []
+    for (const p of m.panels) {
+      const source = tiles.find((t) => t.id === p.tileId)?.source
+      if (source?.type === 'ticker') out.push({ ...p, source })
+    }
+  }
+  return out
+}
+
+const tickerState = (p: TickerPanel): string => (p.source.paused ? '⏸️ Dijeda' : '▶️ Berjalan')
+const tickerToggle = (p: TickerPanel, list: boolean): { text: string; callback_data: string } =>
+  p.source.paused
+    ? { text: `▶️ Jalankan ${p.ref}`, callback_data: `k${list ? 'l' : ''}:r:${p.ref}` }
+    : { text: `⏸️ Jeda ${p.ref}`, callback_data: `k${list ? 'l' : ''}:p:${p.ref}` }
+
+function tickerListMessage(panels: TickerPanel[]): Reply {
+  if (panels.length === 0) {
+    return { text: lines([md`ℹ️ Tidak ada panel teks berjalan di preset yang sedang tampil.`, italic('Tambahkan dari Operator: pilih panel › Jenis sumber › Teks berjalan.')]) }
+  }
+  return {
+    text: lines([
+      md`✏️ ${bold('Teks berjalan')}`,
+      ...panels.map((p) => md`${code(p.ref)} ${tickerState(p)} · ${clip(p.name, 48)}`),
+      '',
+      italic('Ganti teks: /teks 1.2 isi baru (satu pesan per baris).')
+    ]),
+    keyboard: chunk(
+      panels.map((p) => tickerToggle(p, true)),
+      2
+    )
+  }
+}
+
+function tickerPanelMessage(p: TickerPanel, heading?: Md): Reply {
+  return {
+    text: lines([
+      heading ?? md`✏️ ${bold('Teks berjalan')} ${code(p.ref)} · monitor ${p.slot + 1}`,
+      md`Status: ${bold(tickerState(p))}`,
+      p.source.badge ? md`🏷️ Label: ${bold(p.source.badge)}` : null,
+      // Baris dipertahankan (satu pesan per baris), jadi tidak memakai clip().
+      quote(p.source.text.length > 500 ? `${p.source.text.slice(0, 499)}…` : p.source.text),
+      italic(`Ganti teks: /teks ${p.ref} isi baru · jeda: /teks ${p.ref} jeda`)
+    ]),
+    keyboard: [[tickerToggle(p, false)]]
+  }
+}
+
+async function tickerCommand(w: WallFacade, args: string): Promise<Reply> {
+  const s = w.state()
+  const panels = tickerPanels(s)
+  if (!args) return tickerListMessage(panels)
+
+  let panel: TickerPanel | undefined
+  let rest: string
+  const m = /^(\d+\.\d+)(?:\s+([\s\S]*))?$/.exec(args)
+  if (m) {
+    panel = panels.find((p) => p.ref === m[1])
+    if (!panel) {
+      const exists = wallMonitors(s).some((x) => x.panels.some((p) => p.ref === m[1]))
+      return fail(exists ? `Panel ${m[1]} bukan teks berjalan.` : `Panel ${m[1]} tidak ada. Ketik /teks untuk melihat daftarnya.`)
+    }
+    rest = (m[2] ?? '').trim()
+  } else {
+    // Tanpa nomor panel hanya boleh bila ada tepat satu panel teks berjalan.
+    if (panels.length !== 1) {
+      if (panels.length === 0) return tickerListMessage(panels)
+      return {
+        text: lines([md`🤔 Ada ${panels.length} panel teks berjalan, sebutkan nomornya, contoh:`, code(`/teks ${panels[0]!.ref} ${clip(args, 40)}`)]),
+        keyboard: tickerListMessage(panels).keyboard
+      }
+    }
+    panel = panels[0]!
+    rest = args
+  }
+  if (!rest) return tickerPanelMessage(panel)
+
+  const word = rest.toLowerCase()
+  const paused = /^(jeda|pause|stop|berhenti)$/.test(word) ? true : /^(jalan|jalankan|lanjut|play|mulai)$/.test(word) ? false : null
+  const patch = TickerPatchSchema.safeParse(paused === null ? { text: rest } : { paused })
+  if (!patch.success) return fail(patch.error.issues[0]?.message ?? 'Teks tidak valid.')
+  const r = await w.setTicker(panel.slot, panel.tileId, patch.data)
+  if (!r.ok) return fail(r.error)
+  const after = tickerPanels(w.state()).find((p) => p.ref === panel.ref) ?? panel
+  const heading =
+    paused === null
+      ? md`✅ Teks panel ${code(panel.ref)} diganti.`
+      : paused
+        ? md`⏸️ Teks berjalan ${code(panel.ref)} dijeda.`
+        : md`▶️ Teks berjalan ${code(panel.ref)} dijalankan.`
+  return tickerPanelMessage(after, heading)
+}
+
 export interface CommandContext {
   chatId: string
   userId: string | null
@@ -481,6 +592,8 @@ export async function runCommand(cmd: ParsedCommand, w: WallFacade, ctx: Command
       return reload(w, cmd.args)
     case 'foto':
       return photos(w, cmd.args)
+    case 'teks':
+      return tickerCommand(w, cmd.args)
     default:
       return { text: lines([md`❓ Perintah ${code(`/${cmd.name}`)} tidak dikenal.`, md`Ketik /bantuan untuk daftar perintah.`]) }
   }
@@ -520,6 +633,19 @@ export async function runCallback(data: string, w: WallFacade): Promise<Callback
     if (!tpl) return { toast: 'Templat tidak ditemukan (daftar sudah berubah)' }
     w.showBanner(tpl.banner)
     return { toast: `Banner "${tpl.name}" ditampilkan`, reply: bannerShown(tpl.banner, md`📢 Templat ${bold(tpl.name)} ditampilkan di wall`) }
+  }
+  const k = /^k(l?):([pr]):(\d+\.\d+)$/.exec(data)
+  if (k) {
+    const panel = tickerPanels(s).find((p) => p.ref === k[3])
+    if (!panel) return { toast: 'Panel teks berjalan tidak ditemukan (preset sudah berubah)' }
+    const paused = k[2] === 'p'
+    const r = await w.setTicker(panel.slot, panel.tileId, { paused })
+    if (!r.ok) return { toast: r.error }
+    const after = tickerPanels(w.state())
+    return {
+      toast: paused ? `Teks berjalan ${panel.ref} dijeda` : `Teks berjalan ${panel.ref} dijalankan`,
+      edit: k[1] ? tickerListMessage(after) : tickerPanelMessage(after.find((p) => p.ref === panel.ref) ?? panel)
+    }
   }
   return { toast: 'Tombol ini sudah tidak berlaku' }
 }

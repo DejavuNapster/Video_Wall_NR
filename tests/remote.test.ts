@@ -2,7 +2,7 @@ import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createDefaultPreset } from '@shared/layout'
-import { SettingsSchema } from '@shared/schema'
+import { SettingsSchema, SourceSchema } from '@shared/schema'
 import type { AppState } from '@shared/types'
 import { hashPassword, LoginLimiter, SessionStore, verifyPassword } from '../src/main/remote/auth'
 import { RemoteServer } from '../src/main/remote/server'
@@ -83,6 +83,7 @@ describe('RemoteServer (HTTPS)', () => {
     control: {
       tile: vi.fn(async () => ({ ok: true as const })),
       setUrl: vi.fn(async () => ({ ok: true as const })),
+      ticker: vi.fn(async () => ({ ok: true as const })),
       monitor: vi.fn(() => ({ ok: true as const })),
       stepPreset: vi.fn(async () => ({ ok: true as const })),
       monitorView: vi.fn(() => ({ panelFullscreenTileId: null, windowFullscreen: true, cyclePositions: {} })),
@@ -224,6 +225,29 @@ describe('RemoteServer (HTTPS)', () => {
     const res = await post('/api/tile/action', { id: tileId, action: 'back' })
     expect(res.status).toBe(400)
     expect(res.json()).toMatchObject({ ok: false, error: 'Tidak ada halaman sebelumnya' })
+  })
+
+  it('teks berjalan: isi panel ikut di state, perubahan divalidasi sebelum diteruskan', async () => {
+    const tile = preset.monitors[0]!.tiles[0]!
+    const before = tile.source
+    tile.source = SourceSchema.parse({ type: 'ticker', text: 'Selamat datang\nRapat 14.00', badge: 'INFO' })
+    try {
+      const st = (await get('/api/state')).json() as {
+        tickerStyles: Array<{ id: string }>
+        monitors: Array<{ tiles: Array<{ summary: string; ticker?: { text: string; badge: string; paused: boolean } }> }>
+      }
+      expect(st.tickerStyles.length).toBeGreaterThan(0)
+      expect(st.monitors[0]!.tiles[0]).toMatchObject({ summary: 'Selamat datang', ticker: { text: 'Selamat datang\nRapat 14.00', badge: 'INFO', paused: false } })
+
+      expect((await post('/api/tile/ticker', { id: tile.id, patch: { paused: true } })).status).toBe(200)
+      expect(deps.control.ticker).toHaveBeenCalledWith(tile.id, { paused: true })
+      expect((await post('/api/tile/ticker', { id: tile.id, patch: { style: 'neon', speedSec: 6 } })).status).toBe(200)
+      expect((await post('/api/tile/ticker', { id: tile.id, patch: { text: '   ' } })).status).toBe(400)
+      expect((await post('/api/tile/ticker', { id: tile.id, patch: { style: 'pelangi' } })).status).toBe(400)
+      expect((await post('/api/tile/ticker', { id: tile.id, patch: { fontSize: 99 } })).status).toBe(400)
+    } finally {
+      tile.source = before
+    }
   })
 
   it('layar kendali hanya bila diizinkan; gambar JPEG dan masukan tervalidasi', async () => {

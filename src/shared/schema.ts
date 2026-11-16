@@ -5,6 +5,9 @@ export const SCHEMA_VERSION = 1
 
 const httpUrl = z.url({ protocol: /^https?$/ })
 const idString = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/, 'ID hanya boleh huruf, angka, _ dan -')
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/)
+/** Gerak teks berjalan (lihat SourceSchema › ticker). */
+export const TICKER_MOTIONS = ['left', 'right', 'up', 'bounce', 'static'] as const
 /**
  * true = terima sertifikat HTTPS apa pun untuk tile ini (nama host tidak cocok, mis. diakses lewat IP,
  * self-signed, kedaluwarsa). Setara "Proceed anyway" di Chrome; hanya untuk server internal tepercaya.
@@ -19,7 +22,7 @@ const ignoreCertErrors = z.boolean().optional()
  * - whep  : WebRTC WHEP langsung
  * - mjpeg : MJPEG via <img>
  * - clock : jam & tanggal live (tile native, digambar DOM React — tanpa WebContentsView)
- * - ticker: teks berjalan/marquee (tile native, CSS animation — tanpa WebContentsView)
+ * - ticker: teks berjalan/marquee (tile native, Web Animations API — tanpa WebContentsView)
  * Password RTSP TIDAK disimpan di preset (disimpan terenkripsi via safeStorage).
  */
 export const SourceSchema = z.discriminatedUnion('type', [
@@ -57,12 +60,38 @@ export const SourceSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('ticker'),
-    text: z.string().trim().min(1).max(500),
-    /** Durasi dasar (detik) satu putaran lintasan; teks lebih panjang bergerak sebanding. */
+    /** Satu pesan per baris; pesan dirangkai dengan `separator` (atau bergantian pada gerak `static`). */
+    text: z.string().trim().min(1).max(2000),
+    /** Waktu (detik) bagi teks untuk melintasi lebar panel (tinggi panel pada gerak `up`). */
     speedSec: z.number().min(2).max(600).default(20),
-    bgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#0f172a'),
-    fgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#f8fafc'),
-    fontSize: z.number().int().min(12).max(288).default(48)
+    bgColor: hexColor.default('#0f172a'),
+    /** Warna kedua latar (gradasi atas ke bawah); kosong = warna polos. */
+    bgColor2: z.union([z.literal(''), hexColor]).default(''),
+    fgColor: hexColor.default('#f8fafc'),
+    fontSize: z.number().int().min(12).max(288).default(48),
+    /** left = kanan ke kiri, right = kiri ke kanan, up = naik, bounce = bolak-balik, static = diam (pesan bergantian). */
+    motion: z.enum(TICKER_MOTIONS).default('left'),
+    /** true = teks diulang bersambung tanpa layar kosong di antara putaran. */
+    continuous: z.boolean().default(false),
+    paused: z.boolean().default(false),
+    /** Lama (detik) setiap pesan tampil pada gerak `static`. */
+    holdSec: z.number().int().min(2).max(600).default(6),
+    separator: z.string().max(12).default('•'),
+    fontFamily: z.enum(['system', 'sans', 'serif', 'mono', 'condensed', 'impact']).default('system'),
+    fontWeight: z.enum(['normal', 'bold', 'black']).default('normal'),
+    italic: z.boolean().default(false),
+    uppercase: z.boolean().default(false),
+    /** Jarak antarhuruf dalam persen ukuran huruf. */
+    letterSpacing: z.number().int().min(-10).max(50).default(0),
+    effect: z.enum(['none', 'shadow', '3d', 'outline', 'glow']).default('none'),
+    effectColor: hexColor.default('#000000'),
+    effectStrength: z.number().int().min(1).max(10).default(5),
+    /** Tepi kiri/kanan (atas/bawah pada gerak `up`) memudar. */
+    fadeEdges: z.boolean().default(false),
+    /** Label tetap di sisi kiri, mis. "INFO" atau "BREAKING"; kosong = tanpa label. */
+    badge: z.string().trim().max(40).default(''),
+    badgeBg: hexColor.default('#dc2626'),
+    badgeFg: hexColor.default('#ffffff')
   })
 ])
 

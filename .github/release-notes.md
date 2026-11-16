@@ -46,6 +46,7 @@ lalu buka seperti biasa (atau klik-kanan → *Open*).
 - **Ctrl+E** Mode Atur / Mode Tampil · **Ctrl+Alt+O** tampilkan Operator · **Ctrl+Alt+W** tampilkan wall · **Ctrl+Alt+Q** keluar.
 - Panel web berperilaku seperti tab browser: ← → ⟳ ⌂ dan ⧉ buka di panel baru.
 - Panel web dapat menampilkan beberapa dashboard bergantian dan diberi CSS khusus (sembunyikan header/menu).
+- Teks berjalan dengan gaya teks (tebal, miring, kapital), efek bayangan/3D/garis tepi/berpendar, label kiri, beberapa pesan, gaya siap pakai, serta kendali gerak (arah, bersambung, bolak-balik, jeda) dan pratinjau langsung; teks bisa diganti dan dijeda juga dari kendali jarak jauh dan perintah Telegram /teks.
 - Operator menampilkan pratinjau langsung setiap panel; banner bisa disimpan sebagai templat, dijadwalkan, dan diberi bunyi alarm.
 - Peringatan otomatis ke webhook/Telegram bila panel bermasalah (Operator › Pengaturan).
 - Kendali wall lewat perintah bot Telegram dari mana saja: /status, /foto, /preset, /banner, /darurat, /muatulang, dan lainnya, dengan tombol interaktif dan daftar chat/pengguna yang diizinkan.

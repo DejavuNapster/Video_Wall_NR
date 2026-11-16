@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { defaultSource } from '@shared/editor'
 import { isNativeSource } from '@shared/native'
-import type { Source, Tile } from '@shared/types'
+import { TICKER_FONTS, TICKER_SPEEDS, TICKER_STYLES, tickerBackground, type TickerSource } from '@shared/ticker'
+import type { MonitorLayout, Source, Tile } from '@shared/types'
 import { CSS_SNIPPETS } from '@shared/webPanel'
+import { TickerView } from '../../wall/components/TickerView'
 import { useOperator } from '../store'
 import { SOURCE_LABEL } from './MonitorOverview'
 import { StatusDot, stateLabel } from './StatusDot'
-import { btn, CommitColor, CommitNumber, CommitText, inputCls, labelCls } from './ui'
+import { btn, CommitColor, CommitNumber, CommitRange, CommitText, inputCls, labelCls } from './ui'
 
 const TYPES: Array<{ value: Source['type']; text: string }> = [
   { value: 'empty', text: 'Kosong' },
@@ -221,34 +223,7 @@ export function Inspector(): React.JSX.Element {
           </>
         )}
 
-        {src.type === 'ticker' && (
-          <>
-            <Field label="Teks berjalan" hint="Ctrl+Enter atau klik di luar kolom untuk menerapkan.">
-              <CommitText
-                multiline
-                value={src.text}
-                maxLength={500}
-                onCommit={(text) => {
-                  if (text.trim()) setSource({ ...src, text: text.trim() })
-                }}
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Kecepatan (detik)">
-                <CommitNumber value={src.speedSec} min={2} max={600} className={inputCls} onCommit={(speedSec) => setSource({ ...src, speedSec })} />
-              </Field>
-              <Field label="Ukuran teks (px)">
-                <CommitNumber value={src.fontSize} min={12} max={288} className={inputCls} onCommit={(fontSize) => setSource({ ...src, fontSize })} />
-              </Field>
-              <Field label="Warna latar">
-                <CommitColor label="Warna latar" value={src.bgColor} onCommit={(bgColor) => setSource({ ...src, bgColor })} />
-              </Field>
-              <Field label="Warna teks">
-                <CommitColor label="Warna teks" value={src.fgColor} onCommit={(fgColor) => setSource({ ...src, fgColor })} />
-              </Field>
-            </div>
-          </>
-        )}
+        {src.type === 'ticker' && <TickerSettings src={src} tile={tile} monitor={monitor} onChange={setSource} />}
       </div>
 
       <div className="mt-auto flex gap-2 border-t border-slate-800 p-4">
@@ -353,6 +328,266 @@ function WebExtras({ src, onChange }: { src: WebSource; onChange: (source: Sourc
           ))}
         </div>
       </Field>
+    </>
+  )
+}
+
+/** Tombol pilihan tunggal berjajar (mis. arah gerak, efek teks). */
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange
+}: {
+  value: T
+  options: Array<{ value: T; text: string; title?: string }>
+  onChange: (value: T) => void
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          title={o.title}
+          aria-pressed={o.value === value}
+          onClick={() => o.value !== value && onChange(o.value)}
+          className={`${btn.base} px-2 py-1 text-xs ${
+            o.value === value ? 'bg-sky-600 text-white' : 'border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          {o.text}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SubHeading({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return <h3 className="-mb-1 border-t border-slate-800 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{children}</h3>
+}
+
+const MOTIONS: Array<{ value: TickerSource['motion']; text: string; title: string }> = [
+  { value: 'left', text: '← Kiri', title: 'Teks berjalan dari kanan ke kiri' },
+  { value: 'right', text: 'Kanan →', title: 'Teks berjalan dari kiri ke kanan' },
+  { value: 'up', text: '↑ Naik', title: 'Pesan bergulir dari bawah ke atas, satu pesan per baris' },
+  { value: 'bounce', text: '↔ Bolak-balik', title: 'Teks bergerak ke ujung lalu kembali' },
+  { value: 'static', text: 'Diam', title: 'Teks diam di tengah; beberapa pesan tampil bergantian' }
+]
+
+const EFFECTS: Array<{ value: TickerSource['effect']; text: string }> = [
+  { value: 'none', text: 'Tanpa' },
+  { value: 'shadow', text: 'Bayangan' },
+  { value: '3d', text: '3D' },
+  { value: 'outline', text: 'Garis tepi' },
+  { value: 'glow', text: 'Berpendar' }
+]
+
+const SEPARATORS = ['•', '★', '◆', '✦', '|', '—', '·', '']
+
+/** Pengaturan teks berjalan: isi, gerak, gaya teks, efek, dan latar, dengan pratinjau langsung. */
+function TickerSettings({
+  src,
+  tile,
+  monitor,
+  onChange
+}: {
+  src: TickerSource
+  tile: Tile
+  monitor: MonitorLayout
+  onChange: (source: Source) => void
+}): React.JSX.Element {
+  const app = useOperator((s) => s.app)
+  const set = (patch: Partial<TickerSource>): void => onChange({ ...src, ...patch })
+
+  // Pratinjau digambar seukuran panel sebenarnya (perkiraan dari bagian grid monitor) lalu diperkecil.
+  const display = app?.displays.find((d) => d.slot === monitor.slot)
+  const screenW = display?.bounds.width ?? 1920
+  const screenH = display?.bounds.height ?? 1080
+  const panelW = Math.max(40, Math.round((tile.w / monitor.cols) * screenW))
+  const panelH = Math.max(20, Math.round((tile.h / monitor.rows) * screenH))
+  const scale = Math.min(306 / panelW, 140 / panelH)
+  const moving = src.motion !== 'static'
+  const separators = SEPARATORS.includes(src.separator) ? SEPARATORS : [src.separator, ...SEPARATORS]
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <div
+          className="mx-auto overflow-hidden rounded border border-slate-700"
+          style={{ width: Math.round(panelW * scale), height: Math.round(panelH * scale) }}
+          title="Pratinjau langsung"
+        >
+          <div style={{ width: panelW, height: panelH, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
+            <TickerView source={src} />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" className={`${src.paused ? btn.primary : btn.secondary} flex-1`} onClick={() => set({ paused: !src.paused })}>
+            {src.paused ? '▶ Jalankan' : '⏸ Jeda'}
+          </button>
+          <span className="text-xs text-slate-500">{src.paused ? 'Dijeda di wall' : 'Berjalan di wall'}</span>
+        </div>
+      </div>
+
+      <SubHeading>Isi</SubHeading>
+      <Field label="Teks berjalan" hint="Satu pesan per baris. Ctrl+Enter atau klik di luar kolom untuk menerapkan.">
+        <CommitText
+          multiline
+          value={src.text}
+          maxLength={2000}
+          onCommit={(text) => {
+            if (text.trim()) set({ text: text.trim() })
+          }}
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Label kiri">
+          <CommitText value={src.badge} maxLength={40} placeholder="mis. INFO" onCommit={(badge) => set({ badge: badge.trim() })} />
+        </Field>
+        <Field label="Pemisah pesan">
+          <select className={inputCls} value={src.separator} onChange={(e) => set({ separator: e.target.value })}>
+            {separators.map((sep) => (
+              <option key={sep} value={sep}>
+                {sep || 'Spasi'}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {src.badge && (
+          <>
+            <Field label="Latar label">
+              <CommitColor label="Warna latar label" value={src.badgeBg} onCommit={(badgeBg) => set({ badgeBg })} />
+            </Field>
+            <Field label="Teks label">
+              <CommitColor label="Warna teks label" value={src.badgeFg} onCommit={(badgeFg) => set({ badgeFg })} />
+            </Field>
+          </>
+        )}
+      </div>
+
+      <SubHeading>Gerak</SubHeading>
+      <Segmented value={src.motion} options={MOTIONS} onChange={(motion) => set({ motion })} />
+      {moving ? (
+        <Field label="Kecepatan (detik melintasi panel)" hint="Makin kecil makin cepat.">
+          <div className="flex gap-1.5">
+            {TICKER_SPEEDS.map((sp) => (
+              <button
+                key={sp.text}
+                type="button"
+                className={`${btn.secondary} flex-1 px-2 py-1 text-xs ${src.speedSec === sp.sec ? 'border-sky-500 text-sky-300' : ''}`}
+                onClick={() => set({ speedSec: sp.sec })}
+              >
+                {sp.text}
+              </button>
+            ))}
+            <CommitNumber
+              value={src.speedSec}
+              min={2}
+              max={600}
+              integer={false}
+              step={0.5}
+              aria-label="Kecepatan (detik)"
+              className={`${inputCls} w-20`}
+              onCommit={(speedSec) => set({ speedSec })}
+            />
+          </div>
+        </Field>
+      ) : (
+        <Field label="Ganti pesan setiap (detik)" hint="Berlaku bila ada lebih dari satu baris pesan.">
+          <CommitNumber value={src.holdSec} min={2} max={600} className={inputCls} onCommit={(holdSec) => set({ holdSec })} />
+        </Field>
+      )}
+      {(src.motion === 'left' || src.motion === 'right' || src.motion === 'up') && (
+        <Check checked={src.continuous} onChange={(continuous) => set({ continuous })}>
+          Bersambung tanpa jeda
+          <span className="block text-[11px] text-slate-500">Teks diulang terus sehingga panel tidak pernah kosong.</span>
+        </Check>
+      )}
+      {moving && (
+        <Check checked={src.fadeEdges} onChange={(fadeEdges) => set({ fadeEdges })}>
+          Tepi memudar
+        </Check>
+      )}
+
+      <SubHeading>Gaya teks</SubHeading>
+      <Field label="Gaya siap pakai" hint="Mengubah warna, huruf, dan efek; teks dan gerak tidak berubah.">
+        <div className="flex flex-wrap gap-1.5">
+          {TICKER_STYLES.map((st) => (
+            <button
+              key={st.id}
+              type="button"
+              className={`${btn.base} border border-slate-700 px-2 py-1 text-xs hover:brightness-125`}
+              style={{ background: tickerBackground(st.style), color: st.style.fgColor, fontWeight: 700 }}
+              onClick={() => set(st.style)}
+            >
+              {st.name}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Jenis huruf">
+          <select className={inputCls} value={src.fontFamily} onChange={(e) => set({ fontFamily: e.target.value as TickerSource['fontFamily'] })}>
+            {Object.entries(TICKER_FONTS).map(([id, f]) => (
+              <option key={id} value={id}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Ukuran teks (px)">
+          <CommitNumber value={src.fontSize} min={12} max={288} className={inputCls} onCommit={(fontSize) => set({ fontSize })} />
+        </Field>
+      </div>
+      <Segmented
+        value={src.fontWeight}
+        options={[
+          { value: 'normal', text: 'Normal' },
+          { value: 'bold', text: 'Tebal' },
+          { value: 'black', text: 'Sangat tebal' }
+        ]}
+        onChange={(fontWeight) => set({ fontWeight })}
+      />
+      <div className="flex gap-4">
+        <Check checked={src.italic} onChange={(italic) => set({ italic })}>
+          <span className="italic">Miring</span>
+        </Check>
+        <Check checked={src.uppercase} onChange={(uppercase) => set({ uppercase })}>
+          HURUF KAPITAL
+        </Check>
+      </div>
+      <Field label="Jarak huruf">
+        <CommitRange label="Jarak huruf" value={src.letterSpacing} min={-10} max={50} format={(v) => `${v}%`} onCommit={(letterSpacing) => set({ letterSpacing })} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Warna teks">
+          <CommitColor label="Warna teks" value={src.fgColor} onCommit={(fgColor) => set({ fgColor })} />
+        </Field>
+        <Field label={src.bgColor2 ? 'Latar atas' : 'Warna latar'}>
+          <CommitColor label="Warna latar" value={src.bgColor} onCommit={(bgColor) => set({ bgColor })} />
+        </Field>
+        {src.bgColor2 && (
+          <Field label="Latar bawah">
+            <CommitColor label="Warna latar bawah" value={src.bgColor2} onCommit={(bgColor2) => set({ bgColor2 })} />
+          </Field>
+        )}
+      </div>
+      <Check checked={src.bgColor2 !== ''} onChange={(on) => set({ bgColor2: on ? '#000000' : '' })}>
+        Latar gradasi
+      </Check>
+
+      <SubHeading>Efek teks</SubHeading>
+      <Segmented value={src.effect} options={EFFECTS} onChange={(effect) => set({ effect })} />
+      {src.effect !== 'none' && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Warna efek">
+            <CommitColor label="Warna efek" value={src.effectColor} onCommit={(effectColor) => set({ effectColor })} />
+          </Field>
+          <Field label="Kekuatan">
+            <CommitRange label="Kekuatan efek" value={src.effectStrength} min={1} max={10} onCommit={(effectStrength) => set({ effectStrength })} />
+          </Field>
+        </div>
+      )}
     </>
   )
 }

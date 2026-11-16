@@ -277,6 +277,13 @@ details summary {
   flex: 1;
   min-width: 0;
 }
+.pad textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+.chip-label {
+  align-self: center;
+}
 .page-url {
   margin: 0;
   word-break: break-all;

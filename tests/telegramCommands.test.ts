@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDefaultPreset } from '@shared/layout'
-import { SettingsSchema } from '@shared/schema'
+import { SettingsSchema, SourceSchema } from '@shared/schema'
+import { applyTickerPatch, type TickerPatch, type TickerSource } from '@shared/ticker'
 import type { AppState, Preset } from '@shared/types'
 import { alertMessage, testMessage } from '../src/main/telegram/alertMessages'
 import { parseCommand, type Reply, runCallback, runCommand, type WallFacade } from '../src/main/telegram/commands'
@@ -68,6 +69,12 @@ function makeWall(state = makeState()): WallFacade & { s: AppState } {
     }),
     reloadMonitor: vi.fn(() => ({ ok: true as const })),
     reloadTile: vi.fn(() => ({ ok: true as const })),
+    setTicker: vi.fn(async (slot: number, tileId: string, patch: TickerPatch) => {
+      const tile = w.s.activePreset!.monitors.find((m) => m.slot === slot)!.tiles.find((t) => t.id === tileId)!
+      const r = applyTickerPatch(tile.source as TickerSource, patch)
+      if (r.ok) tile.source = r.source
+      return r.ok ? { ok: true as const } : r
+    }),
     capture: vi.fn(async () => Buffer.from([0xff, 0xd8]))
   }
   return w
@@ -179,6 +186,46 @@ describe('perintah Telegram', () => {
     expect(two.photos).toHaveLength(w.s.activePreset!.monitors[1]!.tiles.filter((t) => t.source.type !== 'empty').length)
     w.capture.mockResolvedValue(null as never)
     expect((await run(w, '/foto')).text.plain).toContain('Tidak ada panel')
+  })
+
+  it('/teks: daftar, ganti teks, jeda/jalan, panel tunggal tanpa nomor, dan nomor salah', async () => {
+    const w = makeWall()
+    expect((await run(w, '/teks')).text.plain).toContain('Tidak ada panel teks berjalan')
+    const tile = w.s.activePreset!.monitors[1]!.tiles[0]!
+    tile.source = SourceSchema.parse({ type: 'ticker', text: 'Selamat datang (lobi)\nRapat 14.00' })
+    const ticker = (): TickerSource => tile.source as TickerSource
+
+    const list = await run(w, '/teks')
+    expect(list.text.plain).toContain('2.1 ▶️ Berjalan · Selamat datang (lobi)')
+    expect(list.keyboard?.flat()).toEqual([{ text: '⏸️ Jeda 2.1', callback_data: 'kl:p:2.1' }])
+
+    const changed = await run(w, '/teks 2.1 Baris satu!\nBaris dua')
+    expect(ticker().text).toBe('Baris satu!\nBaris dua')
+    expect(changed.text.plain).toContain('Teks panel 2.1 diganti')
+    expect(changed.text.text).toContain('>Baris satu\\!\n>Baris dua')
+
+    await run(w, '/teks 2.1 jeda')
+    expect(ticker().paused).toBe(true)
+    // Hanya satu panel teks berjalan: nomor panel boleh dilewati.
+    expect((await run(w, '/teks jalan')).text.plain).toContain('dijalankan')
+    expect(ticker().paused).toBe(false)
+    await run(w, '/teks Pengumuman baru')
+    expect(ticker().text).toBe('Pengumuman baru')
+
+    expect((await run(w, '/teks 1.1 halo')).text.plain).toContain('Panel 1.1 bukan teks berjalan')
+    expect((await run(w, '/teks 9.9 halo')).text.plain).toContain('Panel 9.9 tidak ada')
+    expect((await run(w, `/teks 2.1 ${'x'.repeat(2001)}`)).text.plain).toContain('maksimal 2000')
+
+    // Lebih dari satu panel: nomor wajib.
+    w.s.activePreset!.monitors[1]!.tiles[1]!.source = SourceSchema.parse({ type: 'ticker', text: 'Kedua' })
+    expect((await run(w, '/teks halo')).text.plain).toContain('Ada 2 panel teks berjalan')
+
+    const cb = await runCallback('k:p:2.1', w)
+    expect(cb.toast).toBe('Teks berjalan 2.1 dijeda')
+    assertMarkdownV2(cb.edit!.text.text)
+    expect(ticker().paused).toBe(true)
+    expect((await runCallback('kl:r:2.1', w)).edit?.text.plain).toContain('2.1 ▶️ Berjalan')
+    expect((await runCallback('k:p:7.7', w)).toast).toContain('tidak ditemukan')
   })
 
   it('/id dan perintah tak dikenal', async () => {

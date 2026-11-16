@@ -1,5 +1,5 @@
 import { nextTileId } from './layout'
-import { SCHEMA_VERSION } from './schema'
+import { SCHEMA_VERSION, SourceSchema } from './schema'
 import type { MonitorLayout, Preset, Source, Tile } from './types'
 
 /** Operasi murni (tanpa efek samping) untuk mengedit preset. Semua mengembalikan preset baru. */
@@ -124,7 +124,8 @@ export function defaultSource(type: Source['type']): Source {
     case 'clock':
       return { type: 'clock', hour24: true, showDate: true, fontSize: 96 }
     case 'ticker':
-      return { type: 'ticker', text: 'Teks berjalan akan tampil di panel ini', speedSec: 20, bgColor: '#0f172a', fgColor: '#f8fafc', fontSize: 48 }
+      // Opsi lain memakai nilai bawaan skema; panel baru langsung bersambung dengan tepi memudar.
+      return SourceSchema.parse({ type: 'ticker', text: 'Teks berjalan akan tampil di panel ini', speedSec: 12, continuous: true, fadeEdges: true })
     default:
       return { type: 'empty' }
   }

@@ -2,6 +2,7 @@ import { hostname } from 'node:os'
 import { app, type BrowserWindow, globalShortcut, Menu, powerSaveBlocker } from 'electron'
 import { createDefaultPreset } from '@shared/layout'
 import { hasEnabledSchedule } from '@shared/schedule'
+import { applyTickerPatch, type TickerPatch } from '@shared/ticker'
 import type { Result } from '@shared/types'
 import { mergeSettings, type PresetAction, type SettingsPatch } from '@shared/wallPayloads'
 import { tileSummary } from '@shared/tileSummary'
@@ -236,12 +237,21 @@ async function bootstrap(): Promise<void> {
     return zoom === tile.source.zoom ? { ok: true } : svc.edit(slot, { op: 'setZoom', tileId, zoom })
   }
 
+  /** Ubah panel teks berjalan dari kendali jarak jauh dan Telegram (validasi sama dengan skema preset). */
+  const setTicker = async (slot: number, tileId: string, patch: TickerPatch): Promise<Result> => {
+    const tile = svc.current?.monitors.find((m) => m.slot === slot)?.tiles.find((t) => t.id === tileId)
+    if (tile?.source.type !== 'ticker') return { ok: false, error: 'Panel ini bukan teks berjalan' }
+    const next = applyTickerPatch(tile.source, patch)
+    return next.ok ? svc.edit(slot, { op: 'setSourceConfig', tileId, source: next.source }) : next
+  }
+
   /** Perintah wall dari kendali jarak jauh (browser) dan Telegram. */
   const remoteControl = new WallRemoteControl({
     wall,
     zoomTile,
     setSource: (slot, tileId, input) => svc.edit(slot, { op: 'setSource', tileId, input }),
     removeTile: (slot, tileId) => svc.edit(slot, { op: 'removeTile', tileId }),
+    setTicker,
     presetIds: () => hub?.presetList.map((p) => p.id) ?? [],
     activeId: () => svc.activeId,
     activatePreset: (id) => svc.activate(id)
@@ -288,6 +298,7 @@ async function bootstrap(): Promise<void> {
       clearBanner: () => bannerCtl.clear(),
       reloadMonitor: (slot) => wall.reloadAllInSlot(slot),
       reloadTile: (slot, tileId) => wall.reloadTileInSlot(slot, tileId),
+      setTicker,
       capture: (tileId) => wall.captureTileImage(tileId, 1600)
     },
     onStatus: () => hub?.notify()

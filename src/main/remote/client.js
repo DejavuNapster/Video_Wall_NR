@@ -182,7 +182,7 @@
       closeScreen()
       toast(s.screenControl ? 'Panel tidak lagi tampil di wall' : 'Kendali layar dimatikan dari Operator', true)
     }
-    if (focused && focused.tagName === 'INPUT' && $('monitors').contains(focused)) return
+    if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA') && $('monitors').contains(focused)) return
     if (selectedTile && !exists(selectedTile)) selectedTile = null
     $('monitors').replaceChildren(...s.monitors.map(renderMonitor))
   }
@@ -230,6 +230,11 @@
       : live
         ? el('img', { class: 'thumb', alt: '', 'data-tile': t.id })
         : el('div', { class: 'thumb empty', text: t.summary })
+    // Teks berjalan tidak punya cuplikan: tampilkan dengan warnanya sendiri (lewat CSSOM, diizinkan CSP).
+    if (t.ticker) {
+      preview.style.background = t.ticker.bgColor
+      preview.style.color = t.ticker.fgColor
+    }
     return el('div', { class: `tile${selected ? ' selected' : ''}${full ? ' full' : ''}` }, [
       el('button', { type: 'button', class: 'tile-head', 'aria-expanded': String(selected), 'aria-label': `Kendali panel ${t.summary}`, onclick: toggle }, [
         preview,
@@ -290,6 +295,7 @@
         )
       }
     }
+    if (t.ticker) rows.push(...renderTickerPad(t))
     const input = el('input', { type: 'text', inputmode: 'url', autocomplete: 'off', placeholder: 'https://…', 'aria-label': 'URL baru', value: web ? t.url : '' })
     rows.push(
       el(
@@ -323,6 +329,69 @@
       rows.push(el('p', { class: 'muted small pad-note', text: 'Kendali layar belum diizinkan. Aktifkan di Operator › Pengaturan › Kendali jarak jauh.' }))
     }
     return el('div', { class: 'pad' }, rows)
+  }
+
+  const MOTIONS = [
+    { id: 'left', text: '← Kiri' },
+    { id: 'right', text: 'Kanan →' },
+    { id: 'up', text: '↑ Naik' },
+    { id: 'bounce', text: '↔ Bolak-balik' },
+    { id: 'static', text: 'Diam' }
+  ]
+
+  /** Kendali panel teks berjalan: jeda/jalan, isi, gerak, kecepatan, dan gaya siap pakai. */
+  function renderTickerPad(t) {
+    const k = t.ticker
+    const tick = (patch, okText) => act('/api/tile/ticker', { id: t.id, patch }, okText)
+    const choice = (text, on, onclick, title) => el('button', { type: 'button', class: on ? 'on' : '', text, title, onclick: () => !on && onclick() })
+    const text = el('textarea', { rows: '3', maxlength: '2000', 'aria-label': 'Teks berjalan' })
+    text.value = k.text
+    const badge = el('input', { type: 'text', maxlength: '40', autocomplete: 'off', placeholder: 'mis. INFO', 'aria-label': 'Label kiri', value: k.badge })
+    const styles = state.tickerStyles.map((st) => {
+      const b = el('button', { type: 'button', text: st.name, onclick: () => tick({ style: st.id }, `Gaya "${st.name}" diterapkan`) })
+      b.style.background = st.bg
+      b.style.color = st.fg
+      return b
+    })
+    return [
+      el('div', { class: 'pad-row' }, [
+        el('button', {
+          type: 'button',
+          class: k.paused ? 'primary' : '',
+          text: k.paused ? '▶ Jalankan' : '⏸ Jeda',
+          onclick: () => tick({ paused: !k.paused }, k.paused ? 'Teks berjalan dijalankan' : 'Teks berjalan dijeda')
+        })
+      ]),
+      el(
+        'form',
+        {
+          class: 'pad-url',
+          onsubmit: (e) => {
+            e.preventDefault()
+            const value = text.value.trim()
+            if (!value) return toast('Teks tidak boleh kosong', true)
+            if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+            void tick({ text: value, badge: badge.value.trim() }, 'Teks berjalan diganti')
+          }
+        },
+        [
+          el('label', { class: 'small muted', text: 'Teks berjalan (satu pesan per baris)' }),
+          text,
+          el('label', { class: 'small muted', text: 'Label kiri (opsional)' }),
+          el('div', { class: 'row' }, [badge, el('button', { type: 'submit', class: 'primary', text: 'Terapkan' })])
+        ]
+      ),
+      el('span', { class: 'muted small', text: 'Gerak' }),
+      el('div', { class: 'chips' }, MOTIONS.map((m) => choice(m.text, k.motion === m.id, () => tick({ motion: m.id }, 'Gerak teks diubah')))),
+      k.motion === 'static'
+        ? null
+        : el('div', { class: 'chips' }, [
+            el('span', { class: 'muted small chip-label', text: 'Kecepatan' }),
+            ...state.tickerSpeeds.map((sp) => choice(sp.text, k.speedSec === sp.sec, () => tick({ speedSec: sp.sec }, `Kecepatan: ${sp.text}`)))
+          ]),
+      el('span', { class: 'muted small', text: 'Gaya siap pakai' }),
+      el('div', { class: 'chips' }, styles)
+    ]
   }
 
   /** Hapus panel dengan dua ketukan supaya tidak terhapus karena salah sentuh. */

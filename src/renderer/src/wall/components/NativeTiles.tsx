@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { formatDate, formatTime, tickerCycleSec } from '@shared/clock'
+import { formatDate, formatTime } from '@shared/clock'
+import type { TickerSource } from '@shared/ticker'
 import type { Rect, Source } from '@shared/types'
+import { TickerView } from './TickerView'
 
 export type ClockSource = Extract<Source, { type: 'clock' }>
-export type TickerSource = Extract<Source, { type: 'ticker' }>
 
 const box = (r: Rect): React.CSSProperties => ({ position: 'absolute', left: r.x, top: r.y, width: r.width, height: r.height })
 
@@ -32,22 +33,12 @@ export function ClockTile({ source, rect }: { source: ClockSource; rect: Rect })
 }
 
 /**
- * Tile TICKER — teks berjalan (marquee) via CSS animation; durasi satu
- * putaran sebanding panjang teks (logika di @shared/clock, teruji di node).
+ * Tile TICKER — teks berjalan dengan gaya, efek, dan kendali gerak (lihat TickerView, logika di @shared/ticker).
  */
 export function TickerTile({ source, rect }: { source: TickerSource; rect: Rect }): React.JSX.Element {
-  const cycle = tickerCycleSec(source.text, source.speedSec)
   return (
-    <div
-      style={{ ...box(rect), backgroundColor: source.bgColor, color: source.fgColor }}
-      className="flex select-none items-center overflow-hidden"
-    >
-      <span
-        className="ticker-track will-change-transform"
-        style={{ animationDuration: `${cycle}s`, fontSize: source.fontSize, lineHeight: 1.4 }}
-      >
-        {source.text}
-      </span>
+    <div style={box(rect)}>
+      <TickerView source={source} />
     </div>
   )
 }

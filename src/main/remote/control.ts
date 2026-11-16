@@ -1,3 +1,4 @@
+import type { TickerPatch } from '@shared/ticker'
 import type { Result, TileNavAction } from '@shared/types'
 import type { ScreenInput } from './screen'
 
@@ -51,6 +52,8 @@ export interface WallControlDeps {
   /** Ganti URL/sumber panel (deteksi jenis sama seperti kolom URL di wall). */
   setSource(slot: number, tileId: string, input: string): Promise<Result>
   removeTile(slot: number, tileId: string): Promise<Result>
+  /** Ubah panel teks berjalan (teks, jeda, gerak, kecepatan, gaya). */
+  setTicker(slot: number, tileId: string, patch: TickerPatch): Promise<Result>
   presetIds(): string[]
   activeId(): string | null
   activatePreset(id: string): Promise<Result>
@@ -115,6 +118,12 @@ export class WallRemoteControl {
     const input = url.trim()
     if (!input) return { ok: false, error: 'URL tidak boleh kosong' }
     return this.d.setSource(slot, tileId, input)
+  }
+
+  async ticker(tileId: string, patch: TickerPatch): Promise<Result> {
+    const slot = this.d.wall.slotOfTile(tileId)
+    if (slot === null) return NOT_ON_WALL
+    return this.d.setTicker(slot, tileId, patch)
   }
 
   monitor(slot: number, action: RemoteMonitorAction): Result {

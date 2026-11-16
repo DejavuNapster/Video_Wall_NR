@@ -22,6 +22,7 @@ function setup(view: Partial<MonitorView> = {}, presetIds = ['a', 'b', 'c'], act
     zoomTile: vi.fn(async () => ok),
     setSource: vi.fn(async () => ok),
     removeTile: vi.fn(async () => ok),
+    setTicker: vi.fn(async () => ok),
     presetIds: () => presetIds,
     activeId: () => activeId,
     activatePreset: vi.fn(async () => ok)
@@ -85,6 +86,13 @@ describe('WallRemoteControl', () => {
     expect(await ctl.setUrl('t1', '  rtsp://kamera.lan/stream  ')).toEqual(ok)
     expect(deps.setSource).toHaveBeenCalledWith(1, 't1', 'rtsp://kamera.lan/stream')
     expect((await ctl.setUrl('t1', '   ')).ok).toBe(false)
+  })
+
+  it('teks berjalan diubah di monitor tempat panel berada', async () => {
+    const { ctl, deps } = setup()
+    expect(await ctl.ticker('t1', { paused: true })).toEqual(ok)
+    expect(deps.setTicker).toHaveBeenCalledWith(1, 't1', { paused: true })
+    expect((await ctl.ticker('luar', { paused: true })).ok).toBe(false)
   })
 
   it('aksi monitor hanya untuk monitor wall yang aktif', () => {

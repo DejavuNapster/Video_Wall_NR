@@ -152,6 +152,17 @@ Dibuka otomatis saat aplikasi mulai (kecuali `--hide-operator`), lewat menu ☰ 
   - **CSS khusus**: disuntikkan ke setiap halaman panel untuk menyembunyikan header, menu, scrollbar, atau
     pop-up cookie. Diterapkan tanpa memuat ulang halaman; tersedia potongan CSS siap pakai.
 
+  Khusus panel teks berjalan (dengan **pratinjau langsung** di Inspector):
+  - **Isi**: beberapa pesan (satu per baris) dengan pemisah pilihan (•, ★, ◆, …) dan **label kiri** seperti
+    `INFO` atau `BREAKING` dengan warnanya sendiri.
+  - **Gerak**: ke kiri, ke kanan, naik, bolak-balik, atau diam (pesan bergantian dengan transisi memudar);
+    kecepatan Lambat/Sedang/Cepat atau detik melintasi panel; **bersambung tanpa jeda**; tepi memudar; tombol
+    **Jeda/Jalankan** (berhenti di posisinya, bukan mulai ulang).
+  - **Gaya teks**: jenis huruf, Normal/Tebal/Sangat tebal, miring, huruf kapital, jarak huruf, warna teks,
+    latar polos atau gradasi, serta gaya siap pakai (Berita, Neon, Emas 3D, Papan LED, Peringatan, Garis tepi,
+    Polos).
+  - **Efek teks**: bayangan, 3D, garis tepi, atau berpendar, dengan warna dan kekuatan yang bisa diatur.
+
   Posisi/ukuran panel diatur di wall (Mode Atur).
 - **Otomatisasi**: rotasi preset (interval, hanya di Mode Tampil) dan jadwal preset per jam + hari. Selama ada
   jadwal aktif, rotasi dijeda.
@@ -195,6 +206,7 @@ sendiri.
 | `/darurat teks` | Banner darurat dengan alarm, tampil sampai ditutup |
 | `/templat` · `/tutupbanner` | Tampilkan templat banner lewat tombol · tutup banner |
 | `/muatulang` · `/muatulang 2` · `/muatulang 2.3` | Muat ulang semua panel · monitor 2 · panel 3 di monitor 2 |
+| `/teks` · `/teks 1.2 isi baru` · `/teks 1.2 jeda` · `/teks 1.2 jalan` | Daftar panel teks berjalan (dengan tombol jeda/jalan) · ganti teks (satu pesan per baris) · jeda · jalankan lagi. Nomor panel boleh dilewati bila hanya ada satu panel teks berjalan |
 | `/id` | Chat ID dan user ID pengirim (untuk mengatur izin) |
 | `/bantuan` | Daftar perintah |
 
@@ -217,6 +229,8 @@ Operasikan wall dari ponsel atau komputer lain di jaringan yang sama melalui bro
 - **Per panel** (ketuk pratinjau panel): ← kembali, → maju, ⌂ ke URL panel, ⟳ muat ulang, ⛶ layar penuh panel,
   ⧉ buka di panel baru, zoom (− / + / 100%), halaman rotasi sebelumnya/berikutnya, ganti URL panel (juga
   untuk mengisi panel kosong dengan URL halaman web atau alamat kamera), dan 🗑 hapus panel (ketuk dua kali).
+- **Panel teks berjalan:** ⏸ Jeda / ▶ Jalankan, ganti teks (satu pesan per baris) dan label kiri, arah gerak,
+  kecepatan Lambat/Sedang/Cepat, dan gaya siap pakai. Pengaturan rinci (huruf, efek, warna) tetap di Operator.
 - **Kendali layar panel web** (🖱 Kendalikan layar): isi panel tampil langsung di ponsel dan bisa dioperasikan
   seperti remote desktop. Ketuk = klik, ketuk dua kali = klik ganda, geser = gulir (atau seret, lewat tombol
   *Geser*), roda mouse untuk menggulir dari komputer lain, kolom **Ketik** untuk mengirim teks ke kolom yang sedang

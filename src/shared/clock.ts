@@ -1,5 +1,5 @@
 /**
- * Logika murni tile native (jam & ticker) — tanpa DOM, bisa diuji di node.
+ * Logika murni tile jam — tanpa DOM, bisa diuji di node. Logika ticker ada di ./ticker.
  */
 
 const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
@@ -20,16 +20,4 @@ export function formatTime(date: Date, hour24: boolean): string {
 /** Tanggal panjang bahasa Indonesia, mis. "Kamis, 5 Nov 2026". */
 export function formatDate(date: Date): string {
   return `${HARI[date.getDay()]}, ${date.getDate()} ${BULAN[date.getMonth()]} ${date.getFullYear()}`
-}
-
-/**
- * Durasi (detik) satu putaran ticker melintasi panel.
- * `speedSec` adalah kecepatan dasar: waktu lintasan untuk teks 24 karakter.
- * Teks lebih panjang sebanding lebih lama (kecepatan px/detik sama),
- * diklem ke [3, 120] agar tidak terlalu pelat/cepat.
- */
-export function tickerCycleSec(text: string, speedSec: number): number {
-  const chars = Math.max(1, text.trim().length)
-  const sec = (speedSec * chars) / 24
-  return Math.min(120, Math.max(3, Math.round(sec * 10) / 10))
 }

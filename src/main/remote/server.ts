@@ -5,6 +5,7 @@ import { hostname, networkInterfaces } from 'node:os'
 import { z } from 'zod'
 import { BANNER_THEMES } from '@shared/bannerThemes'
 import { EmergencyBannerSchema } from '@shared/schema'
+import { TICKER_SPEEDS, TICKER_STYLES, TickerPatchSchema, type TickerPatch } from '@shared/ticker'
 import { tileSummary } from '@shared/tileSummary'
 import type { AppState, EmergencyBanner, RemoteStatus, Result, Thumbnails } from '@shared/types'
 import { cyclePages } from '@shared/webPanel'
@@ -48,6 +49,7 @@ export interface RemoteDeps {
   control: {
     tile(tileId: string, action: RemoteTileAction): Promise<Result>
     setUrl(tileId: string, url: string): Promise<Result>
+    ticker(tileId: string, patch: TickerPatch): Promise<Result>
     monitor(slot: number, action: RemoteMonitorAction): Result
     stepPreset(dir: 1 | -1): Promise<Result>
     monitorView(slot: number): {
@@ -303,6 +305,10 @@ export class RemoteServer {
         const body = parse(z.object({ id, url: z.string().trim().min(1, 'URL tidak boleh kosong').max(2048) }), await readBody(req))
         return sendResult(res, await this.d.control.setUrl(body.id, body.url))
       }
+      case 'POST /api/tile/ticker': {
+        const body = parse(z.object({ id, patch: TickerPatchSchema }), await readBody(req))
+        return sendResult(res, await this.d.control.ticker(body.id, body.patch))
+      }
       case 'POST /api/monitor/action': {
         const body = parse(z.object({ slot: z.number().int().min(0).max(31), action: z.enum(MONITOR_ACTIONS) }), await readBody(req))
         return sendResult(res, this.d.control.monitor(body.slot, body.action))
@@ -357,6 +363,8 @@ export class RemoteServer {
         : null,
       templates: s.settings.bannerTemplates.map((t) => ({ id: t.id, name: t.name })),
       themes: BANNER_THEMES,
+      tickerStyles: TICKER_STYLES.map((t) => ({ id: t.id, name: t.name, bg: t.style.bgColor, fg: t.style.fgColor })),
+      tickerSpeeds: TICKER_SPEEDS,
       monitors: (s.activePreset?.monitors ?? [])
         .filter((m) => wallSlots.has(m.slot))
         .map((m) => {
@@ -368,6 +376,7 @@ export class RemoteServer {
             tiles: m.tiles.map((t) => {
               const st = s.tileStatus[t.id]
               const web = t.source.type === 'web' ? t.source : null
+              const ticker = t.source.type === 'ticker' ? t.source : null
               return {
                 id: t.id,
                 summary: tileSummary(t),
@@ -382,6 +391,19 @@ export class RemoteServer {
                       canGoForward: st?.canGoForward ?? false,
                       zoom: web.zoom,
                       cycle: web.cycle ? (view?.cyclePositions[t.id] ?? { index: 1, total: cyclePages(web).length }) : null
+                    }
+                  : {}),
+                ...(ticker
+                  ? {
+                      ticker: {
+                        text: ticker.text,
+                        badge: ticker.badge,
+                        paused: ticker.paused,
+                        motion: ticker.motion,
+                        speedSec: ticker.speedSec,
+                        bgColor: ticker.bgColor,
+                        fgColor: ticker.fgColor
+                      }
                     }
                   : {})
               }

@@ -4,6 +4,32 @@ Semua perubahan penting pada Video Wall NR dicatat di berkas ini, versi terbaru 
 setiap versi juga ditampilkan di halaman [Releases](https://github.com/DejavuNapster/Video_Wall_NR/releases).
 Versi 0.2.3 dan 0.2.4 hanya dicatat di sini dan tidak tersedia untuk diunduh.
 
+## [0.2.10] - 2026-11-17
+
+### Ditambahkan
+
+- **Teks berjalan jauh lebih luwes**, diatur di Inspector dengan **pratinjau langsung** seukuran panel:
+  - gaya teks: jenis huruf, Normal/Tebal/Sangat tebal, miring, huruf kapital, dan jarak huruf;
+  - efek teks: **bayangan**, **3D**, **garis tepi**, dan **berpendar**, dengan warna dan kekuatan efek;
+  - kendali gerak: ke kiri, ke kanan, naik, bolak-balik, atau diam dengan pesan bergantian; **bersambung tanpa
+    jeda** (panel tidak pernah kosong); tepi memudar; tombol **Jeda/Jalankan** yang berhenti di posisinya;
+  - beberapa pesan sekaligus (satu per baris) dengan pemisah pilihan, dan **label kiri** (mis. `BREAKING`);
+  - latar gradasi dan tujuh gaya siap pakai (Berita, Neon, Emas 3D, Papan LED, Peringatan, Garis tepi, Polos).
+- **Teks berjalan dari kendali jarak jauh**: Jeda/Jalankan, ganti teks dan label kiri, arah gerak, kecepatan, dan
+  gaya siap pakai langsung dari ponsel. Pratinjau panel teks berjalan tampil dengan warnanya sendiri.
+- **Perintah Telegram `/teks`**: daftar panel teks berjalan dengan tombol jeda/jalan, `/teks 1.2 isi baru` untuk
+  mengganti teks (satu pesan per baris), serta `/teks 1.2 jeda` dan `/teks 1.2 jalan`. Nomor panel boleh dilewati
+  bila hanya ada satu panel teks berjalan.
+
+### Diubah
+
+- Kecepatan teks berjalan kini berarti **detik untuk melintasi lebar panel**, sehingga kecepatannya tetap sama
+  berapa pun panjang teks dan ukuran hurufnya. Panel teks berjalan yang sudah ada tetap tampil seperti biasa,
+  hanya kecepatannya bisa sedikit berbeda.
+- Batas teks berjalan dinaikkan dari 500 menjadi 2000 karakter.
+- Nama panel teks berjalan di peta monitor Operator, kendali jarak jauh, dan `/status` Telegram kini cukup pesan
+  pertamanya (dipotong), bukan seluruh teks.
+
 ## [0.2.9] - 2026-11-15
 
 ### Ditambahkan
