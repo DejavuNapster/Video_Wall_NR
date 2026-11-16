@@ -1,6 +1,6 @@
 import { BANNER_THEMES } from '@shared/bannerThemes'
 import { EmergencyBannerSchema } from '@shared/schema'
-import { TickerPatchSchema, type TickerPatch, type TickerSource } from '@shared/ticker'
+import { TICKER_STYLES, TickerPatchSchema, type TickerPatch, type TickerSource } from '@shared/ticker'
 import { tileSummary } from '@shared/tileSummary'
 import type { AppState, EmergencyBanner, Result, TileState } from '@shared/types'
 import type { Keyboard, Photo } from './api'
@@ -18,7 +18,7 @@ export interface WallFacade {
   clearBanner(): void
   reloadMonitor(slot: number): Result
   reloadTile(slot: number, tileId: string): Result
-  /** Ubah panel teks berjalan (teks, jeda/jalan). */
+  /** Ubah panel teks berjalan (teks, gaya, jeda/jalan). */
   setTicker(slot: number, tileId: string, patch: TickerPatch): Promise<Result>
   /** Gambar JPEG panel yang sedang terlihat (null = tidak tampil / gagal diambil). */
   capture(tileId: string): Promise<Buffer | null>
@@ -87,7 +87,7 @@ export const BOT_COMMANDS: Array<{ command: string; description: string }> = [
   { command: 'templat', description: 'Tampilkan templat banner' },
   { command: 'tutupbanner', description: 'Tutup banner' },
   { command: 'muatulang', description: 'Muat ulang panel (semua, monitor, atau panel)' },
-  { command: 'teks', description: 'Teks berjalan: ganti teks, jeda, jalankan' },
+  { command: 'teks', description: 'Teks berjalan: ganti teks, gaya, jeda, jalankan' },
   { command: 'id', description: 'Chat ID dan user ID Anda' },
   { command: 'bantuan', description: 'Daftar perintah' }
 ]
@@ -191,6 +191,7 @@ export function helpMessage(host: string): Reply {
       c('/teks', 'daftar panel teks berjalan beserta tombol jeda/jalan'),
       c('/teks', 'ganti teks panel 1.2 (satu pesan per baris)', '1.2 Rapat pukul 14.00'),
       c('/teks', 'jeda atau jalankan lagi', '1.2 jeda · 1.2 jalan'),
+      c('/teks', 'pilih gaya lewat tombol, atau langsung dengan namanya', '1.2 gaya · 1.2 gaya neon'),
       '',
       md`🪪 /id — chat ID dan user ID Anda`,
       italic('Nomor panel (mis. 2.3) sama dengan yang tertera di /status.')
@@ -452,7 +453,7 @@ function tickerListMessage(panels: TickerPanel[]): Reply {
       md`✏️ ${bold('Teks berjalan')}`,
       ...panels.map((p) => md`${code(p.ref)} ${tickerState(p)} · ${clip(p.name, 48)}`),
       '',
-      italic('Ganti teks: /teks 1.2 isi baru (satu pesan per baris).')
+      italic('Ganti teks: /teks 1.2 isi baru (satu pesan per baris) · gaya: /teks 1.2 gaya')
     ]),
     keyboard: chunk(
       panels.map((p) => tickerToggle(p, true)),
@@ -469,9 +470,42 @@ function tickerPanelMessage(p: TickerPanel, heading?: Md): Reply {
       p.source.badge ? md`🏷️ Label: ${bold(p.source.badge)}` : null,
       // Baris dipertahankan (satu pesan per baris), jadi tidak memakai clip().
       quote(p.source.text.length > 500 ? `${p.source.text.slice(0, 499)}…` : p.source.text),
-      italic(`Ganti teks: /teks ${p.ref} isi baru · jeda: /teks ${p.ref} jeda`)
+      italic(`Ganti teks: /teks ${p.ref} isi baru · jeda: /teks ${p.ref} jeda · gaya: /teks ${p.ref} gaya neon`)
     ]),
-    keyboard: [[tickerToggle(p, false)]]
+    keyboard: [[tickerToggle(p, false), { text: '🎨 Gaya', callback_data: `ks:${p.ref}` }]]
+  }
+}
+
+/** Huruf kecil tanpa spasi/tanda baca, agar "Emas 3D", "emas3d", dan "gold3d" sama-sama cocok. */
+const styleKey = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/** Gaya siap pakai yang sedang dipakai panel (null = sudah diubah manual di Operator). */
+function currentStyle(src: TickerSource): (typeof TICKER_STYLES)[number] | null {
+  return TICKER_STYLES.find((st) => Object.entries(st.style).every(([k, v]) => src[k as keyof TickerSource] === v)) ?? null
+}
+
+/** Cari gaya dari nama atau id: cocok persis lebih dulu, lalu potongan nama yang hanya cocok dengan satu gaya. */
+function findStyle(query: string): (typeof TICKER_STYLES)[number] | null {
+  const q = styleKey(query)
+  if (!q) return null
+  const exact = TICKER_STYLES.find((st) => styleKey(st.name) === q || st.id === q)
+  if (exact) return exact
+  const partial = TICKER_STYLES.filter((st) => styleKey(st.name).includes(q) || st.id.includes(q))
+  return partial.length === 1 ? partial[0]! : null
+}
+
+function tickerStyleMessage(p: TickerPanel, heading?: Md): Reply {
+  const now = currentStyle(p.source)
+  return {
+    text: lines([
+      heading ?? md`🎨 ${bold('Gaya teks berjalan')} ${code(p.ref)} · monitor ${p.slot + 1}`,
+      md`Gaya saat ini: ${bold(now?.name ?? 'khusus (diatur di Operator)')}`,
+      italic('Gaya mengubah warna, huruf, dan efek; teks dan gerak tidak berubah.')
+    ]),
+    keyboard: chunk(
+      TICKER_STYLES.map((st) => ({ text: `${st === now ? '✅ ' : ''}${st.name}`, callback_data: `kg:${st.id}:${p.ref}` })),
+      3
+    )
   }
 }
 
@@ -503,6 +537,22 @@ async function tickerCommand(w: WallFacade, args: string): Promise<Reply> {
     rest = args
   }
   if (!rest) return tickerPanelMessage(panel)
+
+  const g = /^gaya(?:\s+([\s\S]+))?$/i.exec(rest)
+  if (g) {
+    if (!g[1]) return tickerStyleMessage(panel)
+    const st = findStyle(g[1])
+    if (!st) {
+      return {
+        text: lines([md`❓ Gaya ${bold(clip(g[1], 40))} tidak dikenal.`, md`Pilihan: ${TICKER_STYLES.map((x) => x.name).join(', ')}.`]),
+        keyboard: tickerStyleMessage(panel).keyboard
+      }
+    }
+    const r = await w.setTicker(panel.slot, panel.tileId, { style: st.id })
+    if (!r.ok) return fail(r.error)
+    const after = tickerPanels(w.state()).find((p) => p.ref === panel.ref) ?? panel
+    return tickerStyleMessage(after, md`🎨 Gaya ${bold(st.name)} diterapkan ke panel ${code(panel.ref)}.`)
+  }
 
   const word = rest.toLowerCase()
   const paused = /^(jeda|pause|stop|berhenti)$/.test(word) ? true : /^(jalan|jalankan|lanjut|play|mulai)$/.test(word) ? false : null
@@ -633,6 +683,22 @@ export async function runCallback(data: string, w: WallFacade): Promise<Callback
     if (!tpl) return { toast: 'Templat tidak ditemukan (daftar sudah berubah)' }
     w.showBanner(tpl.banner)
     return { toast: `Banner "${tpl.name}" ditampilkan`, reply: bannerShown(tpl.banner, md`📢 Templat ${bold(tpl.name)} ditampilkan di wall`) }
+  }
+  const ks = /^ks:(\d+\.\d+)$/.exec(data)
+  if (ks) {
+    const panel = tickerPanels(s).find((p) => p.ref === ks[1])
+    if (!panel) return { toast: 'Panel teks berjalan tidak ditemukan (preset sudah berubah)' }
+    return { reply: tickerStyleMessage(panel) }
+  }
+  const kg = /^kg:([a-z0-9]+):(\d+\.\d+)$/.exec(data)
+  if (kg) {
+    const panel = tickerPanels(s).find((p) => p.ref === kg[2])
+    const st = TICKER_STYLES.find((x) => x.id === kg[1])
+    if (!panel || !st) return { toast: 'Panel atau gaya tidak ditemukan (preset sudah berubah)' }
+    const r = await w.setTicker(panel.slot, panel.tileId, { style: st.id })
+    if (!r.ok) return { toast: r.error }
+    const after = tickerPanels(w.state()).find((p) => p.ref === panel.ref) ?? panel
+    return { toast: `Gaya "${st.name}" diterapkan ke panel ${panel.ref}`, edit: tickerStyleMessage(after) }
   }
   const k = /^k(l?):([pr]):(\d+\.\d+)$/.exec(data)
   if (k) {

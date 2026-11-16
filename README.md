@@ -220,6 +220,7 @@ sendiri.
 | `/templat` · `/tutupbanner` | Tampilkan templat banner lewat tombol · tutup banner |
 | `/muatulang` · `/muatulang 2` · `/muatulang 2.3` | Muat ulang semua panel · monitor 2 · panel 3 di monitor 2 |
 | `/teks` · `/teks 1.2 isi baru` · `/teks 1.2 jeda` · `/teks 1.2 jalan` | Daftar panel teks berjalan (dengan tombol jeda/jalan) · ganti teks (satu pesan per baris) · jeda · jalankan lagi. Nomor panel boleh dilewati bila hanya ada satu panel teks berjalan |
+| `/teks 1.2 gaya` · `/teks 1.2 gaya neon` | Pilih gaya siap pakai lewat tombol (gaya yang sedang dipakai ditandai ✅), atau langsung dengan nama/potongan nama: Berita, Neon, Emas 3D, Papan LED, Peringatan, Garis tepi, Polos. Hanya warna, huruf, dan efek yang berubah |
 | `/id` | Chat ID dan user ID pengirim (untuk mengatur izin) |
 | `/bantuan` | Daftar perintah |
 

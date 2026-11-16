@@ -228,6 +228,48 @@ describe('perintah Telegram', () => {
     expect((await runCallback('k:p:7.7', w)).toast).toContain('tidak ditemukan')
   })
 
+  it('/teks gaya: daftar tombol, nama atau id, potongan nama, tidak dikenal, dan tombol gaya', async () => {
+    const w = makeWall()
+    const tile = w.s.activePreset!.monitors[1]!.tiles[0]!
+    tile.source = SourceSchema.parse({ type: 'ticker', text: 'Halo' })
+    const ticker = (): TickerSource => tile.source as TickerSource
+
+    const list = await run(w, '/teks 2.1 gaya')
+    expect(list.text.plain).toContain('Gaya saat ini: Polos')
+    const buttons = list.keyboard!.flat()
+    expect(buttons.map((b) => b.callback_data)).toContain('kg:neon:2.1')
+    expect(buttons.find((b) => b.callback_data === 'kg:plain:2.1')?.text).toBe('✅ Polos')
+
+    const neon = await run(w, '/teks 2.1 gaya Neon')
+    expect(neon.text.plain).toContain('Gaya Neon diterapkan ke panel 2.1')
+    expect(ticker()).toMatchObject({ effect: 'glow', text: 'Halo' })
+    await run(w, '/teks 2.1 gaya emas 3d')
+    expect(ticker().effect).toBe('3d')
+    await run(w, '/teks 2.1 gaya led')
+    expect(ticker().fontFamily).toBe('mono')
+    // Potongan nama yang hanya cocok dengan satu gaya; panel tunggal boleh tanpa nomor.
+    await run(w, '/teks gaya garis')
+    expect(ticker().effect).toBe('outline')
+    expect((await run(w, '/teks 2.1 gaya')).text.plain).toContain('Gaya saat ini: Garis tepi')
+
+    const unknown = await run(w, '/teks 2.1 gaya pelangi')
+    expect(unknown.text.plain).toContain('Gaya pelangi tidak dikenal')
+    expect(unknown.keyboard?.flat().length).toBeGreaterThan(0)
+    expect(ticker().effect).toBe('outline')
+
+    // Tombol "🎨 Gaya" di pesan panel, lalu tombol gaya.
+    const panelMsg = await run(w, '/teks 2.1')
+    expect(panelMsg.keyboard?.[0]?.[1]).toEqual({ text: '🎨 Gaya', callback_data: 'ks:2.1' })
+    const ks = await runCallback('ks:2.1', w)
+    assertMarkdownV2(ks.reply!.text.text)
+    const kg = await runCallback('kg:warning:2.1', w)
+    expect(kg.toast).toBe('Gaya "Peringatan" diterapkan ke panel 2.1')
+    assertMarkdownV2(kg.edit!.text.text)
+    expect(kg.edit?.text.plain).toContain('Gaya saat ini: Peringatan')
+    expect(ticker().bgColor).toBe('#facc15')
+    expect((await runCallback('kg:pelangi:2.1', w)).toast).toContain('tidak ditemukan')
+  })
+
   it('/id dan perintah tak dikenal', async () => {
     const w = makeWall()
     const cmd = parseCommand('/id', 'WallBot')!

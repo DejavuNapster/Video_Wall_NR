@@ -4,6 +4,15 @@ Semua perubahan penting pada Video Wall NR dicatat di berkas ini, versi terbaru 
 setiap versi juga ditampilkan di halaman [Releases](https://github.com/DejavuNapster/Video_Wall_NR/releases).
 Versi 0.2.3 dan 0.2.4 hanya dicatat di sini dan tidak tersedia untuk diunduh.
 
+## [0.2.12] - 2026-11-17
+
+### Ditambahkan
+
+- **Perintah Telegram `/teks gaya`**: `/teks 1.2 gaya` menampilkan tombol gaya siap pakai (gaya yang sedang
+  dipakai ditandai ✅), dan `/teks 1.2 gaya neon` langsung menerapkan gaya berdasarkan nama atau potongan namanya
+  (Berita, Neon, Emas 3D, Papan LED, Peringatan, Garis tepi, Polos). Hanya warna, huruf, dan efek yang berubah;
+  teks dan gerak tetap. Pesan panel `/teks 1.2` kini juga punya tombol **🎨 Gaya**.
+
 ## [0.2.11] - 2026-11-17
 
 ### Diperbaiki
